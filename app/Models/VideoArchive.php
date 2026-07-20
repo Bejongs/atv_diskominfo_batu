@@ -5,17 +5,19 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class VideoArchive extends Model
 {
     use HasFactory;
 
-    public const CATEGORIES = ['News', 'ILM', 'Program'];
-    public const STATUSES = ['Draft', 'Siap Tayang', 'Sudah Tayang', 'Diarsipkan'];
+    public const CATEGORIES = ['News', 'Iklan Layanan Masyarakat', 'Program'];
+    public const ISSUES = ['Ekonomi', 'Lingkungan', 'Sosial'];
+    public const STATUSES = ['Draft', 'Review', 'Siap Tayang', 'Sudah Tayang', 'Diarsipkan'];
 
     protected $fillable = [
-        'user_id', 'title', 'description', 'category', 'status',
-        'air_date', 'file_path', 'original_name', 'mime_type', 'file_size',
+        'user_id', 'title', 'description', 'category', 'issue', 'status',
+        'air_date', 'video_url', 'file_path', 'thumbnail_path', 'original_name', 'mime_type', 'file_size',
     ];
 
     protected function casts(): array
@@ -26,6 +28,11 @@ class VideoArchive extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function activities(): HasMany
+    {
+        return $this->hasMany(VideoArchiveActivity::class);
     }
 
     public function getFormattedSizeAttribute(): string
