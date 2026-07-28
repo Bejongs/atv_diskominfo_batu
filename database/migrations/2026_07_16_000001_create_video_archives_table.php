@@ -15,10 +15,10 @@ return new class extends Migration {
             $table->string('category', 30)->index();
             $table->string('status', 30)->default('Draft')->index();
             $table->date('air_date')->nullable()->index();
-            $table->string('file_path');
-            $table->string('original_name');
-            $table->string('mime_type', 100);
-            $table->unsignedBigInteger('file_size');
+            $table->string('file_path')->nullable();
+            $table->string('original_name')->nullable();
+            $table->string('mime_type', 100)->nullable();
+            $table->unsignedBigInteger('file_size')->nullable();
             $table->timestamps();
         });
     }

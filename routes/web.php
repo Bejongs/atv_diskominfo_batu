@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\VideoArchiveController;
 use Illuminate\Support\Facades\Route;
@@ -16,6 +17,9 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::post('/logout', [AuthController::class, 'destroy'])->name('logout');
+    Route::get('/profil', ProfileController::class)->name('profile');
+    Route::get('/profil/edit', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('/profil', [ProfileController::class, 'update'])->name('profile.update');
     Route::post('/arsip/deteksi-kategori', [VideoArchiveController::class, 'detectCategory'])->name('archives.detect-category');
     Route::get('/arsip/export', [VideoArchiveController::class, 'export'])->name('archives.export');
     Route::get('/upload', [VideoArchiveController::class, 'create'])->name('archives.upload');

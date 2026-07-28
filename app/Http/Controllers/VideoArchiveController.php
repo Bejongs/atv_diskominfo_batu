@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\VideoArchiveActivity;
 use App\Models\VideoArchive;
 use App\Services\CategoryDetector;
+use App\Services\VideoArchiveStatusSyncer;
 use App\Support\SimplePdfExporter;
 use App\Support\SimpleXlsxExporter;
 use Illuminate\Http\JsonResponse;
@@ -26,8 +27,10 @@ class VideoArchiveController extends Controller
         return response()->json($detector->detect($data['title'], $data['description'] ?? null));
     }
 
-    public function index(Request $request)
+    public function index(Request $request, VideoArchiveStatusSyncer $syncer)
     {
+        $syncer->syncDueToAired();
+
         $archives = $this->archiveQuery($request)->paginate(10)->withQueryString();
 
         return view('archives.index', compact('archives'));
@@ -37,11 +40,27 @@ class VideoArchiveController extends Controller
 
     public function store(Request $request)
     {
-        $data = $this->validated($request, true, true);
-        $files = $request->file('video');
+        $data = $this->validated($request, false, true);
+        $files = $request->file('video', []);
         $createdCount = 0;
 
         DB::transaction(function () use ($request, $data, $files, &$createdCount): void {
+            if ($files === []) {
+                $archiveData = $data;
+                $archiveData['user_id'] = $request->user()->id;
+                $archiveData['thumbnail_path'] = $this->storeThumbnail($archiveData['title'], $archiveData['category'], $archiveData['issue']);
+                unset($archiveData['video'], $archiveData['duration_hours'], $archiveData['duration_minute_part'], $archiveData['duration_second_part'], $archiveData['duration_seconds_per_file']);
+
+                $archive = VideoArchive::create($archiveData);
+                $this->logActivity($archive, $request->user()->id, 'created', [
+                    'original_name' => null,
+                    'bulk' => false,
+                ]);
+                $createdCount++;
+
+                return;
+            }
+
             foreach ($files as $index => $file) {
                 $archiveData = $data;
                 $archiveData['user_id'] = $request->user()->id;
@@ -51,7 +70,9 @@ class VideoArchiveController extends Controller
                 $archiveData['original_name'] = $file->getClientOriginalName();
                 $archiveData['mime_type'] = $file->getMimeType();
                 $archiveData['file_size'] = $file->getSize();
-                unset($archiveData['video']);
+                $archiveData['duration_seconds'] = $data['duration_seconds_per_file'][$index] ?? $data['duration_seconds'];
+                $archiveData['duration_minutes'] = $archiveData['duration_seconds'] ? (int) ceil($archiveData['duration_seconds'] / 60) : null;
+                unset($archiveData['video'], $archiveData['duration_hours'], $archiveData['duration_minute_part'], $archiveData['duration_second_part'], $archiveData['duration_seconds_per_file']);
 
                 $archive = VideoArchive::create($archiveData);
                 $this->logActivity($archive, $request->user()->id, 'created', [
@@ -71,7 +92,7 @@ class VideoArchiveController extends Controller
     public function update(Request $request, VideoArchive $archive)
     {
         $data = $this->validated($request, false, false);
-        $before = $archive->only(['title', 'category', 'issue', 'status', 'air_date', 'video_url']);
+        $before = $archive->only(['title', 'category', 'issue', 'age_rating', 'status', 'air_date', 'air_time', 'video_url', 'duration_minutes', 'duration_seconds']);
         if ($request->hasFile('video')) {
             Storage::disk('public')->delete($archive->file_path);
             Storage::disk('public')->delete($archive->thumbnail_path);
@@ -84,19 +105,24 @@ class VideoArchiveController extends Controller
                 'file_size' => $file->getSize(),
             ];
         }
-        unset($data['video']);
+        unset($data['video'], $data['duration_hours'], $data['duration_minute_part'], $data['duration_second_part'], $data['duration_seconds_per_file']);
         $archive->update($data);
         $this->logActivity($archive, $request->user()->id, 'updated', [
             'before' => $before,
-            'after' => $archive->only(['title', 'category', 'issue', 'status', 'air_date', 'video_url']),
+            'after' => $archive->only(['title', 'category', 'issue', 'age_rating', 'status', 'air_date', 'air_time', 'video_url', 'duration_minutes', 'duration_seconds']),
         ]);
         return redirect()->route('archives.show', $archive)->with('success', 'Data arsip berhasil diperbarui.');
     }
 
     public function destroy(VideoArchive $archive)
     {
-        Storage::disk('public')->delete($archive->file_path);
-        Storage::disk('public')->delete($archive->thumbnail_path);
+        if ($archive->file_path) {
+            Storage::disk('public')->delete($archive->file_path);
+        }
+
+        if ($archive->thumbnail_path) {
+            Storage::disk('public')->delete($archive->thumbnail_path);
+        }
         $this->logActivity($archive, auth()->id(), 'deleted', [
             'title' => $archive->title,
             'category' => $archive->category,
@@ -112,7 +138,7 @@ class VideoArchiveController extends Controller
         abort_unless(in_array($format, ['xlsx', 'pdf'], true), 404);
 
         $filename = 'arsip-video-'.now()->format('Ymd_His').'.'.$format;
-        $columns = ['Judul', 'Kategori', 'Issue', 'Status', 'Rencana Tayang', 'Link Video', 'Pengunggah', 'Nama File', 'Ukuran', 'Dibuat'];
+        $columns = ['Judul', 'Kategori', 'Issue', 'Rating Usia', 'Status', 'Durasi', 'Rencana Tayang', 'Link Video', 'Pengunggah', 'Nama File', 'Ukuran', 'Dibuat'];
         $rows = $this->exportRows($request);
 
         if ($format === 'pdf') {
@@ -134,8 +160,10 @@ class VideoArchiveController extends Controller
             $archive->title,
             $archive->category,
             $archive->issue,
+            $archive->age_rating_label,
             $archive->status,
-            $archive->air_date?->format('Y-m-d'),
+            $archive->formatted_duration,
+            $archive->formatted_air_schedule,
             $archive->video_url,
             $archive->user?->name,
             $archive->original_name,
@@ -146,12 +174,14 @@ class VideoArchiveController extends Controller
 
     public function download(VideoArchive $archive)
     {
+        abort_unless($archive->file_path, 404);
         abort_unless(Storage::disk('public')->exists($archive->file_path), 404);
         return Storage::disk('public')->download($archive->file_path, $archive->original_name);
     }
 
     public function preview(VideoArchive $archive)
     {
+        abort_unless($archive->file_path, 404);
         abort_unless(Storage::disk('public')->exists($archive->file_path), 404);
 
         return response()->file(Storage::disk('public')->path($archive->file_path), [
@@ -179,35 +209,58 @@ class VideoArchiveController extends Controller
             'description' => ['nullable', 'string', 'max:5000'],
             'category' => ['required', Rule::in(VideoArchive::CATEGORIES)],
             'issue' => ['required', Rule::in(VideoArchive::ISSUES)],
+            'age_rating' => ['nullable', Rule::in(array_keys(VideoArchive::AGE_RATINGS))],
             'status' => ['required', Rule::in(VideoArchive::STATUSES)],
             'air_date' => ['nullable', 'date'],
+            'air_time' => ['nullable', 'date_format:H:i'],
             'video_url' => ['nullable', 'url', 'max:2048'],
+            'duration_hours' => ['nullable', 'integer', 'min:0', 'max:999'],
+            'duration_minute_part' => ['nullable', 'integer', 'min:0', 'max:59'],
+            'duration_second_part' => ['nullable', 'integer', 'min:0', 'max:59'],
+            'duration_seconds_per_file' => ['nullable', 'array'],
+            'duration_seconds_per_file.*' => ['nullable', 'integer', 'min:1', 'max:3599999'],
         ];
 
         if ($bulk) {
-            $rules['video'] = ['required', 'array', 'min:1'];
+            $rules['video'] = ['nullable', 'array'];
             $rules['video.*'] = ['file', 'mimetypes:video/mp4,video/mpeg,video/quicktime,video/x-msvideo,video/webm', 'max:512000'];
         } else {
             $rules['video'] = [$required ? 'required' : 'nullable', 'file', 'mimetypes:video/mp4,video/mpeg,video/quicktime,video/x-msvideo,video/webm', 'max:512000'];
         }
 
-        return $request->validate($rules, [
+        $data = $request->validate($rules, [
             'video.max' => 'Ukuran video maksimal 500 MB.',
             'video.mimetypes' => 'File harus berupa video MP4, MPEG, MOV, AVI, atau WebM.',
             'video.*.max' => 'Ukuran video maksimal 500 MB.',
             'video.*.mimetypes' => 'Setiap file harus berupa video MP4, MPEG, MOV, AVI, atau WebM.',
+            'duration_hours.max' => 'Durasi jam terlalu besar.',
+            'duration_minute_part.max' => 'Durasi menit harus 0 sampai 59.',
+            'duration_second_part.max' => 'Durasi detik harus 0 sampai 59.',
         ]);
+
+        $hours = (int) ($data['duration_hours'] ?? 0);
+        $minutes = (int) ($data['duration_minute_part'] ?? 0);
+        $seconds = (int) ($data['duration_second_part'] ?? 0);
+        $data['duration_seconds'] = ($hours + $minutes + $seconds) > 0 ? ($hours * 3600) + ($minutes * 60) + $seconds : null;
+        $data['duration_minutes'] = $data['duration_seconds'] ? (int) ceil($data['duration_seconds'] / 60) : null;
+
+        return $data;
     }
 
     private function archiveQuery(Request $request)
     {
+        $issues = collect((array) $request->input('issue'))->filter()->values();
+        $statuses = collect((array) $request->input('status'))->filter()->values();
+        $ageRatings = collect((array) $request->input('age_rating'))->filter()->values();
+
         return VideoArchive::with('user')
             ->when($request->filled('search'), fn ($q) => $q->where(fn ($q) => $q
                 ->where('title', 'like', '%'.$request->search.'%')
                 ->orWhere('description', 'like', '%'.$request->search.'%')))
             ->when($request->filled('category'), fn ($q) => $q->where('category', $request->category))
-            ->when($request->filled('issue'), fn ($q) => $q->where('issue', $request->issue))
-            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
+            ->when($issues->isNotEmpty(), fn ($q) => $q->whereIn('issue', $issues))
+            ->when($statuses->isNotEmpty(), fn ($q) => $q->whereIn('status', $statuses))
+            ->when($ageRatings->isNotEmpty(), fn ($q) => $q->whereIn('age_rating', $ageRatings))
             ->when($request->filled('date_from'), fn ($q) => $q->whereDate('air_date', '>=', $request->date_from))
             ->when($request->filled('date_to'), fn ($q) => $q->whereDate('air_date', '<=', $request->date_to))
             ->when($request->filled('sort'), function ($q) use ($request): void {
@@ -217,8 +270,14 @@ class VideoArchiveController extends Controller
                     return;
                 }
 
-                if ($request->sort === 'title') {
+                if ($request->sort === 'title_asc') {
                     $q->orderBy('title');
+
+                    return;
+                }
+
+                if ($request->sort === 'title_desc') {
+                    $q->orderByDesc('title');
 
                     return;
                 }

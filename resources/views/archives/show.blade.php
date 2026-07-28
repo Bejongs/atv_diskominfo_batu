@@ -13,7 +13,9 @@
     </div>
     <div>
         <a class="btn" href="{{ route('archives.edit',$archive) }}">Edit</a>
-        <a class="btn primary" href="{{ route('archives.download',$archive) }}">Unduh</a>
+        @if($archive->file_path)
+            <a class="btn primary" href="{{ route('archives.download',$archive) }}">Unduh</a>
+        @endif
     </div>
 </div>
 
@@ -28,12 +30,18 @@
 
 <div class="detail-grid">
     <section class="card video-card">
-        <video controls preload="metadata">
-            <source src="{{ route('archives.preview', $archive) }}" type="{{ $archive->mime_type }}">
-            Browser tidak mendukung video.
-        </video>
+        @if($archive->file_path)
+            <video controls preload="metadata">
+                <source src="{{ route('archives.preview', $archive) }}" type="{{ $archive->mime_type }}">
+                Browser tidak mendukung video.
+            </video>
+        @else
+            <div class="empty">Belum ada file video.</div>
+        @endif
         <div class="video-links">
-            <a class="video-fallback-link btn" href="{{ route('archives.preview', $archive) }}" target="_blank" rel="noopener">Buka preview video</a>
+            @if($archive->file_path)
+                <a class="video-fallback-link btn" href="{{ route('archives.preview', $archive) }}" target="_blank" rel="noopener">Buka preview video</a>
+            @endif
             @if($archive->video_url)
                 <a class="video-source-link" href="{{ $archive->video_url }}" target="_blank" rel="noopener noreferrer">Buka link video</a>
             @endif
@@ -48,8 +56,12 @@
             <dd>{{ $archive->category }}</dd>
             <dt>Issue</dt>
             <dd>{{ $archive->issue ?? 'Belum dipilih' }}</dd>
+            <dt>Rating usia</dt>
+            <dd><span class="badge age-rating age-rating-{{ $archive->age_rating ? str($archive->age_rating)->lower() : 'empty' }}">{{ $archive->age_rating_label }}</span></dd>
             <dt>Rencana tayang</dt>
-            <dd>{{ $archive->air_date?->format('d F Y') ?? 'Belum ditentukan' }}</dd>
+            <dd>{{ $archive->formatted_air_schedule }}</dd>
+            <dt>Durasi</dt>
+            <dd>{{ $archive->formatted_duration }}</dd>
             <dt>Link video</dt>
             <dd>
                 @if($archive->video_url)
@@ -59,7 +71,7 @@
                 @endif
             </dd>
             <dt>Nama file</dt>
-            <dd>{{ $archive->original_name }}</dd>
+            <dd>{{ $archive->original_name ?? 'Belum ada file' }}</dd>
             <dt>Ukuran</dt>
             <dd>{{ $archive->formatted_size }}</dd>
             <dt>Pengunggah</dt>

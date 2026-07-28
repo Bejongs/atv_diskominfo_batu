@@ -30,9 +30,11 @@ class ArchiveManagementTest extends TestCase
             'description' => 'Materi berita harian.',
             'category' => 'News',
             'issue' => 'Ekonomi',
+            'age_rating' => 'R',
             'status' => 'Siap Tayang',
             'air_date' => '2026-07-20',
             'video_url' => 'https://example.com/video/berita-kota-batu',
+            'duration_seconds_per_file' => [754, 5125],
             'video' => [
                 UploadedFile::fake()->create('berita-1.mp4', 1024, 'video/mp4'),
                 UploadedFile::fake()->create('berita-2.mp4', 1024, 'video/mp4'),
@@ -43,11 +45,47 @@ class ArchiveManagementTest extends TestCase
         $this->assertDatabaseCount('video_archives', 2);
         $this->assertDatabaseCount('video_archive_activities', 2);
 
-        $archive = \App\Models\VideoArchive::firstOrFail();
+        $archive = \App\Models\VideoArchive::orderBy('id')->firstOrFail();
         $this->assertSame('News', $archive->category);
         $this->assertSame('Ekonomi', $archive->issue);
+        $this->assertSame('R', $archive->age_rating);
+        $this->assertSame('Remaja (13-17 tahun)', $archive->age_rating_label);
         $this->assertSame('https://example.com/video/berita-kota-batu', $archive->video_url);
+        $this->assertSame(754, $archive->duration_seconds);
+        $this->assertSame(13, $archive->duration_minutes);
+        $this->assertSame('12 menit 34 detik', $archive->formatted_duration);
+        $this->assertSame(5125, VideoArchive::orderBy('id')->skip(1)->firstOrFail()->duration_seconds);
         Storage::disk('public')->assertExists($archive->file_path);
+        Storage::disk('public')->assertExists($archive->thumbnail_path);
+    }
+
+    public function test_user_can_create_video_archive_without_uploading_file(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post(route('archives.store'), [
+            'title' => 'Link Berita Kota Batu',
+            'description' => 'Materi berita dari link eksternal.',
+            'category' => 'News',
+            'issue' => 'Sosial',
+            'age_rating' => 'A',
+            'status' => 'Draft',
+            'air_date' => '2026-07-21',
+            'video_url' => 'https://example.com/video/link-berita',
+        ]);
+
+        $response->assertRedirect(route('archives.index'));
+        $this->assertDatabaseHas('video_archives', [
+            'title' => 'Link Berita Kota Batu',
+            'video_url' => 'https://example.com/video/link-berita',
+            'age_rating' => 'A',
+            'file_path' => null,
+            'original_name' => null,
+        ]);
+
+        $archive = VideoArchive::where('title', 'Link Berita Kota Batu')->firstOrFail();
+        $this->assertSame('Tidak ada file', $archive->formatted_size);
         Storage::disk('public')->assertExists($archive->thumbnail_path);
     }
 
@@ -144,6 +182,41 @@ class ArchiveManagementTest extends TestCase
         ]);
 
         Artisan::call('archives:sync-statuses');
+
+        $this->assertDatabaseHas('video_archives', [
+            'id' => $archive->id,
+            'status' => 'Sudah Tayang',
+        ]);
+
+        $this->assertDatabaseHas('video_archive_activities', [
+            'video_archive_id' => $archive->id,
+            'action' => 'auto_status_updated',
+        ]);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_due_siap_tayang_archive_is_auto_updated_when_archive_page_is_opened(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-07-17 08:00:00'));
+
+        $user = User::factory()->create();
+        $archive = VideoArchive::create([
+            'user_id' => $user->id,
+            'title' => 'Arsip Hari Ini',
+            'description' => 'Konten siap tayang hari ini.',
+            'category' => 'News',
+            'issue' => 'Ekonomi',
+            'status' => 'Siap Tayang',
+            'air_date' => '2026-07-17',
+            'file_path' => 'videos/test.mp4',
+            'thumbnail_path' => null,
+            'original_name' => 'test.mp4',
+            'mime_type' => 'video/mp4',
+            'file_size' => 1024,
+        ]);
+
+        $this->actingAs($user)->get(route('archives.index'))->assertOk();
 
         $this->assertDatabaseHas('video_archives', [
             'id' => $archive->id,

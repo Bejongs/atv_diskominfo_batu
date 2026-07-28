@@ -4,11 +4,25 @@ namespace App\Support;
 
 class SimplePdfExporter
 {
+    public static function makeReport(array $report): string
+    {
+        $content = self::pageHeader($report['title'], $report['generated_at'], $report['period']);
+        $content .= self::summaryCards($report['summary_cards']);
+        $content .= self::chartSection($report['charts'][0], 547, 548, 24, false);
+        $content .= self::chartSection($report['charts'][1], 547, 412, 24, false);
+        $content .= self::chartSection($report['charts'][2], 547, 240, 24, false);
+
+        return self::document([$content]);
+    }
+
     public static function make(string $title, array $columns, array $rows): string
     {
-        $widths = count($columns) === 2
-            ? [130, 660]
-            : [105, 98, 52, 62, 68, 124, 78, 96, 46, 65];
+        $widths = match (count($columns)) {
+            2 => [130, 660],
+            3 => [190, 170, 430],
+            6 => [92, 150, 110, 70, 118, 250],
+            default => [105, 98, 52, 62, 68, 124, 78, 96, 46, 65],
+        };
         $pages = [];
         $content = self::pageHeader($title);
         $y = 500;
@@ -35,9 +49,72 @@ class SimplePdfExporter
         return self::document($pages);
     }
 
-    private static function pageHeader(string $title): string
+    private static function pageHeader(string $title, ?string $generatedAt = null, ?string $period = null): string
     {
-        return self::text(34, 555, $title, 18).self::text(34, 535, 'Diekspor pada '.now()->format('d M Y H:i'), 9);
+        $content = self::text(24, 800, $title, 18);
+        $content .= self::text(24, 780, 'Diekspor pada '.($generatedAt ?: now()->format('d M Y H:i')), 9);
+
+        if ($period) {
+            $content .= self::text(424, 780, 'Periode: '.$period, 9);
+        }
+
+        return $content;
+    }
+
+    private static function summaryCards(array $cards): string
+    {
+        $content = '';
+        $layout = [
+            [24, 708, 166],
+            [201, 708, 166],
+            [378, 708, 166],
+            [24, 632, 166],
+            [201, 632, 166],
+        ];
+
+        foreach (array_values($cards) as $index => $card) {
+            [$x, $top, $width] = $layout[$index] ?? [24, 632, 255];
+            $content .= self::rect($x, $top - 68, $width, 68, 'FFFFFF', true);
+            $content .= self::rect($x, $top - 6, $width, 6, $card['color'] ?? '64748B', false);
+            $content .= self::text($x + 10, $top - 18, $card['label'], 9);
+            $content .= self::text($x + 10, $top - 38, (string) $card['value'], 17);
+            $content .= self::text($x + 10, $top - 56, $card['hint'], 8.5);
+        }
+
+        return $content;
+    }
+
+    private static function chartSection(array $chart, int $width, int $top, int $x = 24, bool $showSubtitle = true): string
+    {
+        $height = 46 + (count($chart['items']) * 18);
+        $content = self::rect($x, $top - $height, $width, $height, 'FFFFFF', true);
+        $content .= self::text($x + 12, $top - 16, $chart['title'], 11.5);
+        if ($showSubtitle && filled($chart['subtitle'] ?? null)) {
+            $content .= self::text($x + 12, $top - 30, $chart['subtitle'], 8);
+        }
+
+        $labelX = $x + 12;
+        $barX = $x + 138;
+        $barWidth = 290;
+        $countX = $x + 438;
+        $percentX = $x + 486;
+        $rowTop = $showSubtitle ? $top - 40 : $top - 30;
+
+        foreach ($chart['items'] as $index => $item) {
+            $rowY = $rowTop - ($index * 18);
+            $content .= self::text($labelX, $rowY, $item['label'], 8.4);
+            $content .= self::rect($barX, $rowY - 6, $barWidth, 8, 'E5E7EB', true);
+
+            $fillWidth = (int) round($barWidth * (($item['percent'] ?? 0) / 100));
+            if ($fillWidth > 0) {
+                $content .= self::rect($barX, $rowY - 6, $fillWidth, 8, $item['color'] ?? $chart['color'] ?? '2563EB', false);
+            }
+
+            $content .= self::text($countX, $rowY, ($item['count'] ?? 0).' data', 8.2);
+            $content .= self::text($percentX, $rowY, ($item['percent'] ?? 0).'%', 8.2);
+        }
+
+        return $content;
     }
 
     private static function tableHeader(array $columns, array $widths, int $y): string
@@ -135,7 +212,7 @@ class SimplePdfExporter
             $pageObject = 3 + ($index * 2);
             $contentObject = $pageObject + 1;
             $kids[] = $pageObject.' 0 R';
-            $objects[] = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 $fontObject 0 R >> >> /Contents $contentObject 0 R >>";
+            $objects[] = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 $fontObject 0 R >> >> /Contents $contentObject 0 R >>";
             $objects[] = "<< /Length ".strlen($stream)." >>\nstream\n".$stream."\nendstream";
         }
 

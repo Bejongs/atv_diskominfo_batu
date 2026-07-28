@@ -5,11 +5,14 @@ namespace App\Http\Controllers;
 use Carbon\CarbonPeriod;
 use App\Models\VideoArchiveActivity;
 use App\Models\VideoArchive;
+use App\Services\VideoArchiveStatusSyncer;
 
 class DashboardController extends Controller
 {
-    public function __invoke()
+    public function __invoke(VideoArchiveStatusSyncer $syncer)
     {
+        $syncer->syncDueToAired();
+
         $trendStartDate = now()->subDays(6)->startOfDay();
         $dailyUploads = VideoArchive::where('created_at', '>=', $trendStartDate)
             ->get(['created_at'])

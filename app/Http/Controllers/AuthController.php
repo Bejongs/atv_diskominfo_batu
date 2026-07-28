@@ -2,12 +2,39 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\VideoArchive;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
-    public function create() { return view('auth.login'); }
+    public function create()
+    {
+        $statusProgress = [
+            'Draft' => 20,
+            'Review' => 45,
+            'Siap Tayang' => 75,
+            'Sudah Tayang' => 100,
+            'Diarsipkan' => 100,
+        ];
+
+        $latestArchives = VideoArchive::latest()
+            ->limit(3)
+            ->get(['id', 'title', 'category', 'status'])
+            ->map(function (VideoArchive $archive) use ($statusProgress) {
+                $archive->progress = $statusProgress[$archive->status] ?? 0;
+
+                return $archive;
+            });
+
+        $loginStats = [
+            'total' => VideoArchive::count(),
+            'ready' => VideoArchive::where('status', 'Siap Tayang')->count(),
+            'aired' => VideoArchive::where('status', 'Sudah Tayang')->count(),
+        ];
+
+        return view('auth.login', compact('latestArchives', 'loginStats'));
+    }
 
     public function store(Request $request)
     {

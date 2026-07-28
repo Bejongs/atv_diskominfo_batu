@@ -3,7 +3,18 @@
 @section('content')
 @php
     $activeCategory = request('category');
-    $activeIssue = request('issue');
+    $activeIssues = collect((array) request('issue'))->filter()->values();
+    $activeStatuses = collect((array) request('status'))->filter()->values();
+    $activeRatings = collect((array) request('age_rating'))->filter()->values();
+    $activeSort = request('sort') ?: 'latest';
+    $dateFrom = request('date_from');
+    $dateTo = request('date_to');
+    $activeFilterCount = $activeIssues->count()
+        + $activeStatuses->count()
+        + $activeRatings->count()
+        + ($activeSort !== 'latest' ? 1 : 0)
+        + ($dateFrom ? 1 : 0)
+        + ($dateTo ? 1 : 0);
 @endphp
 
 <div class="archive-hero">
@@ -13,63 +24,122 @@
         <p>Kelola, cari, dan kurasi seluruh materi tayangan ATV dalam satu ruang kerja.</p>
     </div>
     <div class="archive-hero-actions">
-        <details class="export-menu">
-            <summary class="btn">Export Data</summary>
-            <div>
-                <a href="{{ route('archives.export', array_merge(request()->query(), ['format' => 'xlsx'])) }}">Excel (.xlsx)</a>
-                <a href="{{ route('archives.export', array_merge(request()->query(), ['format' => 'pdf'])) }}">PDF (.pdf)</a>
-            </div>
-        </details>
         <a class="btn primary archive-upload" href="{{ route('archives.upload') }}">&#43; Upload Video</a>
     </div>
 </div>
 
 <section class="archive-main">
-    <form class="archive-filter archive-filter-clean card" method="get">
+    <form id="archive-filter-form" class="archive-filter archive-filter-clean archive-preference-filter card" method="get">
         <div class="filter-fields">
             <div class="filter-row search-row">
                 <input name="search" value="{{ request('search') }}" placeholder="Cari judul atau deskripsi...">
-                <button class="btn primary">Filter</button>
-            </div>
-
-            <div class="filter-row option-row">
                 @if($activeCategory)
                     <input type="hidden" name="category" value="{{ $activeCategory }}">
                 @endif
+                <button type="button" class="btn filter-preview-toggle" data-filter-open>
+                    Pilih Preferensi
+                    @if($activeFilterCount)
+                        <span>{{ $activeFilterCount }}</span>
+                    @endif
+                </button>
+                <button class="btn primary">Cari</button>
+            </div>
 
-                <select name="issue">
-                    <option value="">Semua issue</option>
-                    @foreach(\App\Models\VideoArchive::ISSUES as $issue)
-                        <option @selected($activeIssue === $issue)>{{ $issue }}</option>
-                    @endforeach
-                </select>
+            <div class="filter-preview-strip" aria-label="Filter aktif">
+                @foreach($activeIssues as $issue)
+                    <span>Issue: {{ $issue }}</span>
+                @endforeach
+                @foreach($activeStatuses as $status)
+                    <span>Status: {{ $status }}</span>
+                @endforeach
+                @foreach($activeRatings as $rating)
+                    <span>Usia: {{ \App\Models\VideoArchive::AGE_RATINGS[$rating] ?? $rating }}</span>
+                @endforeach
+                @if($activeSort !== 'latest')
+                    <span>Urutan: {{ ['oldest' => 'Terlama', 'title_asc' => 'Abjad A-Z', 'title_desc' => 'Abjad Z-A'][$activeSort] ?? 'Terbaru' }}</span>
+                @endif
+                @if($dateFrom || $dateTo)
+                    <span>Tanggal: {{ $dateFrom ?: 'awal' }} - {{ $dateTo ?: 'akhir' }}</span>
+                @endif
+            </div>
+        </div>
 
-                <select name="status">
-                    <option value="">Semua status</option>
-                    @foreach(\App\Models\VideoArchive::STATUSES as $status)
-                        <option @selected(request('status') === $status)>{{ $status }}</option>
-                    @endforeach
-                </select>
-
-                <select name="sort">
-                    <option value="">Terbaru</option>
-                    <option value="oldest" @selected(request('sort') === 'oldest')>Terlama</option>
-                    <option value="title" @selected(request('sort') === 'title')>Judul A-Z</option>
-                </select>
-
-                <div class="date-range">
-                    <label>
-                        <span>Dari</span>
-                        <input type="date" name="date_from" value="{{ request('date_from') }}" aria-label="Tanggal mulai">
-                    </label>
-                    <i></i>
-                    <label>
-                        <span>Sampai</span>
-                        <input type="date" name="date_to" value="{{ request('date_to') }}" aria-label="Tanggal akhir">
-                    </label>
+        <div class="filter-sheet" data-filter-sheet hidden>
+            <div class="filter-sheet-backdrop" data-filter-close></div>
+            <div class="filter-sheet-panel" role="dialog" aria-modal="true" aria-labelledby="filter-sheet-title">
+                <div class="filter-sheet-head">
+                    <h2 id="filter-sheet-title">Pilih Preferensi</h2>
+                    <button type="button" class="filter-sheet-close" data-filter-close aria-label="Tutup filter">&times;</button>
                 </div>
 
-                <a class="btn reset-filter" href="{{ route('archives.index') }}">Reset</a>
+                <div class="filter-sheet-body">
+                    <section class="filter-choice-group">
+                        <h3>Issue</h3>
+                        <div class="filter-chip-grid">
+                            @foreach(\App\Models\VideoArchive::ISSUES as $issue)
+                                <label class="filter-chip">
+                                    <input type="checkbox" name="issue[]" value="{{ $issue }}" @checked($activeIssues->contains($issue))>
+                                    <span>{{ $issue }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </section>
+
+                    <section class="filter-choice-group">
+                        <h3>Status</h3>
+                        <div class="filter-chip-grid">
+                            @foreach(\App\Models\VideoArchive::STATUSES as $status)
+                                <label class="filter-chip">
+                                    <input type="checkbox" name="status[]" value="{{ $status }}" @checked($activeStatuses->contains($status))>
+                                    <span>{{ $status }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </section>
+
+                    <section class="filter-choice-group">
+                        <h3>Urutan</h3>
+                        <div class="filter-chip-grid">
+                            @foreach(['latest' => 'Terbaru', 'oldest' => 'Terlama', 'title_asc' => 'Abjad A-Z', 'title_desc' => 'Abjad Z-A'] as $sortValue => $sortLabel)
+                                <label class="filter-chip">
+                                    <input type="radio" name="sort" value="{{ $sortValue }}" @checked($activeSort === $sortValue)>
+                                    <span>{{ $sortLabel }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </section>
+
+                    <section class="filter-choice-group">
+                        <h3>Rentang Tanggal Tayang</h3>
+                        <div class="filter-date-grid">
+                            <label>
+                                <span>Dari tanggal</span>
+                                <input type="date" name="date_from" value="{{ $dateFrom }}">
+                            </label>
+                            <label>
+                                <span>Sampai tanggal</span>
+                                <input type="date" name="date_to" value="{{ $dateTo }}">
+                            </label>
+                        </div>
+                    </section>
+
+                    <section class="filter-choice-group">
+                        <h3>Rating Usia</h3>
+                        <div class="filter-chip-grid">
+                            @foreach(\App\Models\VideoArchive::AGE_RATINGS as $ratingCode => $ratingLabel)
+                                <label class="filter-chip">
+                                    <input type="checkbox" name="age_rating[]" value="{{ $ratingCode }}" @checked($activeRatings->contains($ratingCode))>
+                                    <span>{{ $ratingLabel }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </section>
+                </div>
+
+                <div class="filter-sheet-actions">
+                    <a class="btn reset-filter" href="{{ route('archives.index', $activeCategory ? ['category' => $activeCategory] : []) }}">Atur Ulang</a>
+                    <button class="btn primary">Terapkan</button>
+                </div>
             </div>
         </div>
     </form>
@@ -90,9 +160,11 @@
                         <th>Video</th>
                         <th>Kategori</th>
                         <th>Issue</th>
+                        <th>Rating Usia</th>
                         <th>Status</th>
                         <th>Pengunggah</th>
                         <th>Rencana Tayang</th>
+                        <th>Durasi</th>
                         <th>Ukuran</th>
                         <th></th>
                     </tr>
@@ -111,15 +183,17 @@
                                     </span>
                                     <div>
                                         <strong>{{ $item->title }}</strong>
-                                        <small>{{ $item->original_name }}</small>
+                                        <small>{{ $item->original_name ?? ($item->video_url ? 'Link video' : 'Tanpa file video') }}</small>
                                     </div>
                                 </a>
                             </td>
                             <td><span class="badge category">{{ $item->category }}</span></td>
                             <td><span class="badge issue">{{ $item->issue ?? 'Belum dipilih' }}</span></td>
+                            <td><span class="badge age-rating age-rating-{{ $item->age_rating ? str($item->age_rating)->lower() : 'empty' }}">{{ $item->age_rating_label }}</span></td>
                             <td><span class="badge status-{{ str($item->status)->slug() }}">{{ $item->status }}</span></td>
                             <td>{{ $item->user->name }}</td>
-                            <td>{{ $item->air_date?->format('d M Y') ?? '&mdash;' }}</td>
+                            <td>{{ $item->formatted_air_schedule }}</td>
+                            <td>{{ $item->formatted_duration }}</td>
                             <td>{{ $item->formatted_size }}</td>
                             <td class="actions">
                                 <a href="{{ route('archives.show',$item) }}">Detail</a>
@@ -128,7 +202,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="empty archive-empty">
+                            <td colspan="10" class="empty archive-empty">
                                 <strong>Arsip tidak ditemukan.</strong>
                                 <span>Coba ubah kategori, issue, status, atau rentang tanggal.</span>
                             </td>
@@ -141,6 +215,34 @@
 
     {{ $archives->links('pagination::simple-default') }}
 </section>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const sheet = document.querySelector('[data-filter-sheet]');
+    const openButton = document.querySelector('[data-filter-open]');
+    const closeButtons = document.querySelectorAll('[data-filter-close]');
+
+    const openSheet = () => {
+        if (!sheet) return;
+        sheet.hidden = false;
+        document.body.classList.add('filter-sheet-open');
+    };
+
+    const closeSheet = () => {
+        if (!sheet) return;
+        sheet.hidden = true;
+        document.body.classList.remove('filter-sheet-open');
+    };
+
+    openButton?.addEventListener('click', openSheet);
+    closeButtons.forEach((button) => button.addEventListener('click', closeSheet));
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && sheet && !sheet.hidden) {
+            closeSheet();
+        }
+    });
+});
+</script>
 @endsection
 
 

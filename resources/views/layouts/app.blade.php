@@ -8,11 +8,15 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/app.css">
+    <link rel="stylesheet" href="/css/report-overrides.css?v=2">
 </head>
 <body>
 <div class="shell">
     <aside class="sidebar">
-        <a class="brand" href="{{ route('dashboard') }}"><span>ATV</span><div>Arsip Digital<small>Kominfo Kota Batu</small></div></a>
+        <a class="brand" href="{{ route('dashboard') }}">
+            <img class="brand-logo" src="/images/atv-logo-crop.png" alt="Logo ATV">
+            <div>Arsip Digital<small>Diskominfo Kota Batu</small></div>
+        </a>
         <nav>
             <a class="{{ request()->routeIs('dashboard') ? 'active' : '' }}" href="{{ route('dashboard') }}">
                 <span class="sidebar-icon icon-dashboard" aria-hidden="true">
@@ -65,13 +69,19 @@
                 </span>
                 <span>Laporan</span>
             </a>
+            <a class="{{ request()->routeIs('profile*') ? 'active' : '' }}" href="{{ route('profile') }}">
+                <span class="sidebar-icon icon-user" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M12 12.2A4.2 4.2 0 1 0 12 3.8a4.2 4.2 0 0 0 0 8.4Zm0 2c-4.2 0-7.8 2.2-8.8 5.4A1.2 1.2 0 0 0 4.3 21h15.4a1.2 1.2 0 0 0 1.1-1.4c-1-3.2-4.6-5.4-8.8-5.4Z"/></svg>
+                </span>
+                <span>Profil</span>
+            </a>
         </nav>
         <div class="profile"><div class="avatar">{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}</div><div><strong>{{ auth()->user()->name }}</strong><small>{{ auth()->user()->email }}</small></div></div>
         <form action="{{ route('logout') }}" method="post">@csrf<button class="logout">Keluar</button></form>
     </aside>
     <div class="sidebar-backdrop" onclick="document.querySelector('.sidebar')?.classList.remove('open')"></div>
     <main class="main">
-        <header><button class="menu" onclick="document.querySelector('.sidebar')?.classList.toggle('open')">&#9776;</button><div><small>Sistem Manajemen Arsip</small><strong>ATV Kominfo Kota Batu</strong></div></header>
+        <header><button class="menu" onclick="document.querySelector('.sidebar')?.classList.toggle('open')">&#9776;</button><div><small>Sistem Manajemen Arsip</small><strong>ATV Diskominfo Kota Batu</strong></div></header>
         <div class="content">
             @if(session('success'))<div class="alert success">{{ session('success') }}</div>@endif
             @yield('content')
