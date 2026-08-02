@@ -671,3 +671,90 @@
         padding:20px !important;
     }
 }
+
+/* Mobile report safeguards */
+@media(max-width:950px){
+    .report-hero,
+    .report-metrics,
+    .report-grid,
+    .report-grid-wide{
+        grid-template-columns:1fr !important;
+    }
+
+    .report-hero{
+        padding:22px !important;
+        border-radius:22px !important;
+    }
+
+    .report-format-card{
+        width:100% !important;
+    }
+
+    .report-filter-grid .report-aside{
+        padding:20px !important;
+    }
+
+    .report-filter-grid .report-title-filter-row,
+    .report-filter-grid .report-export-row{
+        grid-template-columns:1fr !important;
+        gap:12px !important;
+    }
+
+    .report-filter-grid .report-title-filter-row .filter-preview-toggle,
+    .report-filter-grid .report-export-row .btn,
+    .report-filter-grid .report-action-form input,
+    .report-filter-grid .report-action-form select{
+        width:100% !important;
+        min-width:0 !important;
+    }
+
+    .report-block{
+        min-height:0 !important;
+    }
+
+    .report-table-wrap{
+        overflow:auto !important;
+        -webkit-overflow-scrolling:touch;
+    }
+
+    .report-table{
+        min-width:760px;
+    }
+}
+
+@media(max-width:720px){
+    .report-metrics{
+        grid-template-columns:1fr !important;
+        gap:12px !important;
+    }
+
+    .report-metric,
+    .report-block,
+    .report-bars,
+    .rating-list,
+    .technical-grid,
+    .status-chart{
+        padding:18px !important;
+    }
+
+    .report-section-head,
+    .card-head{
+        display:grid !important;
+        grid-template-columns:1fr;
+        gap:8px;
+    }
+
+    .report-bar-row,
+    .status-chart-row,
+    .rating-row,
+    .technical-grid{
+        grid-template-columns:1fr !important;
+        gap:10px !important;
+    }
+
+    .report-bar-row b,
+    .status-chart-row b{
+        justify-self:start !important;
+        text-align:left !important;
+    }
+}

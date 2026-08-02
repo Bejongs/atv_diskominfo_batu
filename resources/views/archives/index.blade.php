@@ -144,76 +144,142 @@
         </div>
     </form>
 
-    <div class="archive-table card">
-        <div class="archive-table-head">
-            <div>
-                <span class="eyebrow">{{ $activeCategory ?: 'Semua kategori' }}</span>
-                <h2>Daftar Video</h2>
+    <form id="archive-bulk-form" method="post" action="{{ route('archives.bulk-action') }}">
+        @csrf
+        <div class="archive-selection-bar" data-selection-bar hidden>
+            <label class="archive-select-all">
+                <input type="checkbox" aria-label="Pilih semua arsip" data-selection-select-all>
+                <span>Pilih semua</span>
+            </label>
+            <strong><span data-selected-count>0</span> dipilih</strong>
+            <select name="status" data-bulk-status>
+                <option value="">Ubah status ke...</option>
+                @foreach(\App\Models\VideoArchive::STATUSES as $status)
+                    <option value="{{ $status }}">{{ $status }}</option>
+                @endforeach
+            </select>
+            <button class="btn primary" type="submit" name="action" value="change_status" data-status-action>Ubah Status</button>
+            <button class="btn danger compact-danger" type="submit" name="action" value="delete" data-delete-selected>Hapus</button>
+        </div>
+        <div data-selection-hidden></div>
+
+        <div class="archive-table card">
+            <div class="archive-table-head">
+                <div>
+                    <span class="eyebrow">{{ $activeCategory ?: 'Semua kategori' }}</span>
+                    <h2>Daftar Video</h2>
+                </div>
+                <span>{{ $archives->total() }} arsip</span>
             </div>
-            <span>{{ $archives->total() }} arsip</span>
+
+            <div class="table-wrap">
+                <table class="archive-table-grid">
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" aria-label="Pilih semua arsip" data-table-select-all></th>
+                            <th>Video</th>
+                            <th>Kategori</th>
+                            <th>Issue</th>
+                            <th>Rating Usia</th>
+                            <th>Status</th>
+                            <th>Pengunggah</th>
+                            <th>Rencana Tayang</th>
+                            <th>Durasi</th>
+                            <th>Ukuran</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($archives as $item)
+                            <tr>
+                                <td data-label="Pilih">
+                                    <input type="checkbox" value="{{ $item->id }}" data-bulk-item>
+                                </td>
+                                <td data-label="Video">
+                                    <a class="video-title" href="{{ route('archives.show',$item) }}">
+                                        <span class="video-thumb">
+                                            @if($item->thumbnail_path)
+                                                <img src="{{ route('archives.thumbnail', $item) }}" alt="{{ $item->title }}">
+                                            @else
+                                                &#9654;
+                                            @endif
+                                        </span>
+                                        <div>
+                                            <strong>{{ $item->title }}</strong>
+                                            <small>{{ $item->original_name ?? ($item->video_url ? 'Link video' : 'Tanpa file video') }}</small>
+                                        </div>
+                                    </a>
+                                </td>
+                                <td data-label="Kategori"><span class="badge category">{{ $item->category }}</span></td>
+                                <td data-label="Issue"><span class="badge issue">{{ $item->issue ?? 'Belum dipilih' }}</span></td>
+                                <td data-label="Rating Usia"><span class="badge age-rating age-rating-{{ $item->age_rating ? str($item->age_rating)->lower() : 'empty' }}">{{ $item->age_rating_label }}</span></td>
+                                <td data-label="Status"><span class="badge status-{{ str($item->status)->slug() }}">{{ $item->status }}</span></td>
+                                <td data-label="Pengunggah">{{ $item->user->name }}</td>
+                                <td data-label="Rencana Tayang">{{ $item->formatted_air_schedule }}</td>
+                                <td data-label="Durasi">{{ $item->formatted_duration }}</td>
+                                <td data-label="Ukuran">{{ $item->formatted_size }}</td>
+                                <td class="actions" data-label="Aksi">
+                                    <a href="{{ route('archives.show',$item) }}">Detail</a>
+                                    <a href="{{ route('archives.edit',$item) }}">Edit</a>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="11" class="empty archive-empty">
+                                    <strong>Arsip tidak ditemukan.</strong>
+                                    <span>Coba ubah kategori, issue, status, atau rentang tanggal.</span>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
         </div>
 
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Video</th>
-                        <th>Kategori</th>
-                        <th>Issue</th>
-                        <th>Rating Usia</th>
-                        <th>Status</th>
-                        <th>Pengunggah</th>
-                        <th>Rencana Tayang</th>
-                        <th>Durasi</th>
-                        <th>Ukuran</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($archives as $item)
-                        <tr>
-                            <td>
-                                <a class="video-title" href="{{ route('archives.show',$item) }}">
-                                    <span class="video-thumb">
-                                        @if($item->thumbnail_path)
-                                            <img src="{{ route('archives.thumbnail', $item) }}" alt="{{ $item->title }}">
-                                        @else
-                                            &#9654;
-                                        @endif
-                                    </span>
-                                    <div>
-                                        <strong>{{ $item->title }}</strong>
-                                        <small>{{ $item->original_name ?? ($item->video_url ? 'Link video' : 'Tanpa file video') }}</small>
-                                    </div>
-                                </a>
-                            </td>
-                            <td><span class="badge category">{{ $item->category }}</span></td>
-                            <td><span class="badge issue">{{ $item->issue ?? 'Belum dipilih' }}</span></td>
-                            <td><span class="badge age-rating age-rating-{{ $item->age_rating ? str($item->age_rating)->lower() : 'empty' }}">{{ $item->age_rating_label }}</span></td>
-                            <td><span class="badge status-{{ str($item->status)->slug() }}">{{ $item->status }}</span></td>
-                            <td>{{ $item->user->name }}</td>
-                            <td>{{ $item->formatted_air_schedule }}</td>
-                            <td>{{ $item->formatted_duration }}</td>
-                            <td>{{ $item->formatted_size }}</td>
-                            <td class="actions">
-                                <a href="{{ route('archives.show',$item) }}">Detail</a>
-                                <a href="{{ route('archives.edit',$item) }}">Edit</a>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="10" class="empty archive-empty">
-                                <strong>Arsip tidak ditemukan.</strong>
-                                <span>Coba ubah kategori, issue, status, atau rentang tanggal.</span>
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
+        <div class="archive-mobile-list">
+            @forelse($archives as $item)
+                <article class="archive-mobile-card">
+                    <label class="archive-mobile-check">
+                        <input type="checkbox" value="{{ $item->id }}" data-bulk-item>
+                    </label>
+                    <a class="archive-mobile-video" href="{{ route('archives.show', $item) }}">
+                        <span class="video-thumb">
+                            @if($item->thumbnail_path)
+                                <img src="{{ route('archives.thumbnail', $item) }}" alt="{{ $item->title }}">
+                            @else
+                                &#9654;
+                            @endif
+                        </span>
+                        <div>
+                            <strong>{{ $item->title }}</strong>
+                            <small>{{ $item->original_name ?? ($item->video_url ? 'Link video' : 'Tanpa file video') }}</small>
+                        </div>
+                    </a>
+                    <div class="archive-mobile-badges">
+                        <span class="badge category">{{ $item->category }}</span>
+                        <span class="badge issue">{{ $item->issue ?? 'Belum dipilih' }}</span>
+                        <span class="badge age-rating age-rating-{{ $item->age_rating ? str($item->age_rating)->lower() : 'empty' }}">{{ $item->age_rating_label }}</span>
+                        <span class="badge status-{{ str($item->status)->slug() }}">{{ $item->status }}</span>
+                    </div>
+                    <div class="archive-mobile-meta">
+                        <span>{{ $item->formatted_air_schedule }}</span>
+                        <span>{{ $item->user->name }}</span>
+                    </div>
+                    <div class="archive-mobile-actions">
+                        <a class="btn" href="{{ route('archives.show',$item) }}">Detail</a>
+                        <a class="btn primary" href="{{ route('archives.edit',$item) }}">Edit</a>
+                    </div>
+                </article>
+            @empty
+                <div class="archive-mobile-empty card">
+                    <strong>Arsip tidak ditemukan.</strong>
+                    <span>Coba ubah kategori, issue, status, atau rentang tanggal.</span>
+                </div>
+            @endforelse
         </div>
-    </div>
+    </form>
 
-    {{ $archives->links('pagination::simple-default') }}
+    {{ $archives->links('pagination.simple-atv') }}
 </section>
 
 <script>
@@ -221,6 +287,60 @@ document.addEventListener('DOMContentLoaded', () => {
     const sheet = document.querySelector('[data-filter-sheet]');
     const openButton = document.querySelector('[data-filter-open]');
     const closeButtons = document.querySelectorAll('[data-filter-close]');
+    const bulkForm = document.getElementById('archive-bulk-form');
+    const selectionBar = document.querySelector('[data-selection-bar]');
+    const selectedCount = document.querySelector('[data-selected-count]');
+    const tableSelectAll = document.querySelector('[data-table-select-all]');
+    const selectionSelectAll = document.querySelector('[data-selection-select-all]');
+    const bulkItems = document.querySelectorAll('[data-bulk-item]');
+    const bulkStatus = document.querySelector('[data-bulk-status]');
+    const hiddenSelection = document.querySelector('[data-selection-hidden]');
+    const selectionKey = 'atv.archive.selected';
+
+    const getStoredSelection = () => {
+        try {
+            return new Set(JSON.parse(localStorage.getItem(selectionKey) || '[]').map(String));
+        } catch {
+            return new Set();
+        }
+    };
+
+    const storeSelection = (selected) => {
+        localStorage.setItem(selectionKey, JSON.stringify(Array.from(selected)));
+    };
+
+    const renderHiddenSelection = (selected) => {
+        if (!hiddenSelection) return;
+        hiddenSelection.innerHTML = '';
+        selected.forEach((id) => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'selected[]';
+            input.value = id;
+            hiddenSelection.appendChild(input);
+        });
+    };
+
+    const syncTableSelectAll = () => {
+        const selected = getStoredSelection();
+        bulkItems.forEach((item) => {
+            item.checked = selected.has(String(item.value));
+        });
+
+        if (!tableSelectAll) return;
+        const items = Array.from(bulkItems);
+        const uniqueCurrentIds = Array.from(new Set(items.map((item) => String(item.value))));
+        const checkedOnPage = uniqueCurrentIds.filter((id) => selected.has(id)).length;
+        tableSelectAll.checked = uniqueCurrentIds.length > 0 && checkedOnPage === uniqueCurrentIds.length;
+        tableSelectAll.indeterminate = checkedOnPage > 0 && checkedOnPage < uniqueCurrentIds.length;
+        if (selectionSelectAll) {
+            selectionSelectAll.checked = tableSelectAll.checked;
+            selectionSelectAll.indeterminate = tableSelectAll.indeterminate;
+        }
+        if (selectedCount) selectedCount.textContent = selected.size;
+        if (selectionBar) selectionBar.hidden = selected.size === 0;
+        renderHiddenSelection(selected);
+    };
 
     const openSheet = () => {
         if (!sheet) return;
@@ -236,6 +356,68 @@ document.addEventListener('DOMContentLoaded', () => {
 
     openButton?.addEventListener('click', openSheet);
     closeButtons.forEach((button) => button.addEventListener('click', closeSheet));
+    tableSelectAll?.addEventListener('change', () => {
+        const selected = getStoredSelection();
+        const checked = tableSelectAll.checked;
+        bulkItems.forEach((item) => {
+            if (checked) {
+                selected.add(String(item.value));
+            } else {
+                selected.delete(String(item.value));
+            }
+        });
+        storeSelection(selected);
+        syncTableSelectAll();
+    });
+    selectionSelectAll?.addEventListener('change', () => {
+        const selected = getStoredSelection();
+        const checked = selectionSelectAll.checked;
+        bulkItems.forEach((item) => {
+            if (checked) {
+                selected.add(String(item.value));
+            } else {
+                selected.delete(String(item.value));
+            }
+        });
+        storeSelection(selected);
+        syncTableSelectAll();
+    });
+    bulkItems.forEach((item) => item.addEventListener('change', () => {
+        const selected = getStoredSelection();
+        if (item.checked) {
+            selected.add(String(item.value));
+        } else {
+            selected.delete(String(item.value));
+        }
+        storeSelection(selected);
+        syncTableSelectAll();
+    }));
+    bulkForm?.addEventListener('submit', (event) => {
+        const submitter = event.submitter;
+        const action = submitter?.value;
+        const selected = getStoredSelection();
+        const checked = selected.size;
+
+        if (!checked) {
+            event.preventDefault();
+            return;
+        }
+
+        if (action === 'change_status' && !bulkStatus?.value) {
+            event.preventDefault();
+            bulkStatus?.focus();
+            return;
+        }
+
+        if (action === 'delete' && !confirm(`Hapus ${checked} arsip yang dipilih?`)) {
+            event.preventDefault();
+            return;
+        }
+
+        renderHiddenSelection(selected);
+        localStorage.removeItem(selectionKey);
+    });
+    syncTableSelectAll();
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && sheet && !sheet.hidden) {
             closeSheet();

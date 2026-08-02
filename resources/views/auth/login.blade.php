@@ -89,12 +89,12 @@
 
                     <label>
                         Email
-                        <input type="email" name="email" value="{{ old('email') }}" required autofocus placeholder="admin@atv.test">
+                        <input type="email" name="email" value="{{ old('email') }}" required autofocus placeholder="admin@atv.kominfo">
                     </label>
 
                     <label>
                         Kata sandi
-                        <input type="password" name="password" required placeholder="Masukkan kata sandi">
+                        <input type="password" name="password" required placeholder="atv12345">
                     </label>
 
                     @error('email')

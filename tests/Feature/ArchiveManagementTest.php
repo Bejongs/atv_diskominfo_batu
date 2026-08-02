@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\VideoArchive;
+use App\Models\VideoArchiveActivity;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Artisan;
@@ -59,6 +60,17 @@ class ArchiveManagementTest extends TestCase
         Storage::disk('public')->assertExists($archive->thumbnail_path);
     }
 
+    public function test_user_can_open_schedule_page(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->get(route('schedules.index'))
+            ->assertOk()
+            ->assertSee('Jadwal Tayang')
+            ->assertSee('Kalender')
+            ->assertSee('Tayang Hari Ini');
+    }
+
     public function test_user_can_create_video_archive_without_uploading_file(): void
     {
         Storage::fake('public');
@@ -87,6 +99,40 @@ class ArchiveManagementTest extends TestCase
         $archive = VideoArchive::where('title', 'Link Berita Kota Batu')->firstOrFail();
         $this->assertSame('Tidak ada file', $archive->formatted_size);
         Storage::disk('public')->assertExists($archive->thumbnail_path);
+    }
+
+    public function test_user_can_change_status_for_selected_archives(): void
+    {
+        $user = User::factory()->create();
+        $first = $this->createArchiveForBulkAction($user, ['title' => 'Arsip Pilihan 1']);
+        $second = $this->createArchiveForBulkAction($user, ['title' => 'Arsip Pilihan 2']);
+
+        $response = $this->actingAs($user)->post(route('archives.bulk-action'), [
+            'selected' => [$first->id, $second->id],
+            'action' => 'change_status',
+            'status' => 'Review',
+        ]);
+
+        $response->assertRedirect(route('archives.index'));
+        $this->assertDatabaseHas('video_archives', ['id' => $first->id, 'status' => 'Review']);
+        $this->assertDatabaseHas('video_archives', ['id' => $second->id, 'status' => 'Review']);
+    }
+
+    public function test_user_can_delete_selected_archives(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->create();
+        $first = $this->createArchiveForBulkAction($user, ['title' => 'Arsip Hapus 1']);
+        $second = $this->createArchiveForBulkAction($user, ['title' => 'Arsip Hapus 2']);
+
+        $response = $this->actingAs($user)->post(route('archives.bulk-action'), [
+            'selected' => [$first->id, $second->id],
+            'action' => 'delete',
+        ]);
+
+        $response->assertRedirect(route('archives.index'));
+        $this->assertDatabaseMissing('video_archives', ['id' => $first->id]);
+        $this->assertDatabaseMissing('video_archives', ['id' => $second->id]);
     }
 
     public function test_user_can_export_filtered_video_archives_to_xlsx_and_pdf(): void
@@ -119,6 +165,47 @@ class ArchiveManagementTest extends TestCase
         $pdfResponse->assertHeader('content-type', 'application/pdf');
         $this->assertStringStartsWith('%PDF', $pdfResponse->getContent());
         $this->assertStringContainsString('Berita Kota Batu', $pdfResponse->getContent());
+    }
+
+    public function test_archive_update_logs_field_level_changes(): void
+    {
+        $user = User::factory()->create();
+        $archive = VideoArchive::create([
+            'user_id' => $user->id,
+            'title' => 'Arsip Lama',
+            'description' => 'Deskripsi arsip lama.',
+            'category' => 'News',
+            'issue' => 'Ekonomi',
+            'age_rating' => 'SU',
+            'status' => 'Draft',
+            'air_date' => '2026-07-20',
+            'air_time' => '08:00',
+            'video_url' => 'https://example.com/video-lama',
+            'duration_seconds' => 600,
+            'duration_minutes' => 10,
+        ]);
+
+        $response = $this->actingAs($user)->put(route('archives.update', $archive), [
+            'title' => 'Arsip Baru',
+            'description' => $archive->description,
+            'category' => $archive->category,
+            'issue' => $archive->issue,
+            'age_rating' => $archive->age_rating,
+            'status' => 'Review',
+            'air_date' => '2026-07-21',
+            'air_time' => '09:30',
+            'video_url' => $archive->video_url,
+        ]);
+
+        $response->assertRedirect(route('archives.show', $archive));
+
+        $activity = VideoArchiveActivity::where('video_archive_id', $archive->id)->where('action', 'updated')->latest()->firstOrFail();
+        $this->assertNotEmpty($activity->meta['changes']);
+        $statusChange = collect($activity->meta['changes'])->firstWhere('field', 'status');
+        $this->assertNotNull($statusChange);
+        $this->assertSame('Status', $statusChange['label']);
+        $this->assertSame('Draft', $statusChange['before']);
+        $this->assertSame('Review', $statusChange['after']);
     }
 
     public function test_thumbnail_route_returns_svg_cover(): void
@@ -229,5 +316,23 @@ class ArchiveManagementTest extends TestCase
         ]);
 
         Carbon::setTestNow();
+    }
+
+    private function createArchiveForBulkAction(User $user, array $overrides = []): VideoArchive
+    {
+        return VideoArchive::create(array_merge([
+            'user_id' => $user->id,
+            'title' => 'Arsip Pilihan',
+            'description' => 'Konten pilihan.',
+            'category' => 'News',
+            'issue' => 'Ekonomi',
+            'status' => 'Draft',
+            'air_date' => '2026-07-20',
+            'file_path' => null,
+            'thumbnail_path' => null,
+            'original_name' => null,
+            'mime_type' => null,
+            'file_size' => null,
+        ], $overrides));
     }
 }

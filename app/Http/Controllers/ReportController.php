@@ -12,17 +12,17 @@ class ReportController extends Controller
 {
     public function index(Request $request)
     {
-        $query = $this->query($request);
-        $archives = $query->get();
+        $query = $this->baseQuery($request);
+        $stats = $this->statsFromQuery($query);
 
         return view('reports.index', [
             'filters' => $this->filters($request),
-            'stats' => $this->stats($archives),
-            'summaryCards' => $this->summaryCards($archives),
-            'categoryBreakdown' => $this->categoryBreakdown($archives),
-            'statusBreakdown' => $this->statusBreakdown($archives),
-            'ageRatingBreakdown' => $this->ageRatingBreakdown($archives),
-            'recentArchives' => $archives->take(20),
+            'stats' => $stats,
+            'summaryCards' => $this->summaryCardsFromStats($stats),
+            'categoryBreakdown' => $this->categoryBreakdownFromQuery($query),
+            'statusBreakdown' => $this->statusBreakdownFromQuery($query),
+            'ageRatingBreakdown' => $this->ageRatingBreakdownFromQuery($query),
+            'recentArchives' => (clone $query)->with('user')->latest()->limit(20)->get(),
         ]);
     }
 
@@ -45,9 +45,16 @@ class ReportController extends Controller
             'date_to' => ['nullable', 'date'],
         ]);
 
-        $archives = $this->query($request)->get();
-        $stats = $this->stats($archives);
-        $report = $this->reportPayload($request, $archives, $stats, $data['title']);
+        $query = $this->baseQuery($request);
+        $stats = $this->statsFromQuery($query);
+        $report = $this->reportPayload(
+            $request,
+            $stats,
+            $data['title'],
+            $this->categoryBreakdownFromQuery($query),
+            $this->statusBreakdownFromQuery($query),
+            $this->ageRatingBreakdownFromQuery($query),
+        );
         $filename = (string) str($data['title'])->slug().'-'.now()->format('Ymd_His').'.'.$data['format'];
 
         if ($data['format'] === 'pdf') {
@@ -57,26 +64,34 @@ class ReportController extends Controller
             ]);
         }
 
+        $archives = $this->query($request)->get();
+
         return response(SimpleXlsxExporter::make($data['title'], $this->reportArchiveColumns(), $this->reportArchiveRows($archives)), 200, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 
-    private function query(Request $request)
+    private function baseQuery(Request $request)
     {
         $categories = $this->filterValues($request, 'category');
         $issues = $this->filterValues($request, 'issue');
         $statuses = $this->filterValues($request, 'status');
         $ageRatings = $this->filterValues($request, 'age_rating');
 
-        return VideoArchive::with('user')
+        return VideoArchive::query()
             ->when($categories->isNotEmpty(), fn ($query) => $query->whereIn('category', $categories))
             ->when($issues->isNotEmpty(), fn ($query) => $query->whereIn('issue', $issues))
             ->when($statuses->isNotEmpty(), fn ($query) => $query->whereIn('status', $statuses))
             ->when($ageRatings->isNotEmpty(), fn ($query) => $query->whereIn('age_rating', $ageRatings))
             ->when($request->filled('date_from'), fn ($query) => $query->whereDate('air_date', '>=', $request->date_from))
-            ->when($request->filled('date_to'), fn ($query) => $query->whereDate('air_date', '<=', $request->date_to))
+            ->when($request->filled('date_to'), fn ($query) => $query->whereDate('air_date', '<=', $request->date_to));
+    }
+
+    private function query(Request $request)
+    {
+        return $this->baseQuery($request)
+            ->with('user')
             ->latest();
     }
 
@@ -140,6 +155,53 @@ class ReportController extends Controller
         ];
     }
 
+    private function statsFromQuery($query): array
+    {
+        $row = (clone $query)
+            ->selectRaw('COUNT(*) as total_arsip')
+            ->selectRaw("SUM(CASE WHEN category = 'News' THEN 1 ELSE 0 END) as total_news")
+            ->selectRaw("SUM(CASE WHEN category = 'Iklan Layanan Masyarakat' THEN 1 ELSE 0 END) as total_iklan_layanan_masyarakat")
+            ->selectRaw("SUM(CASE WHEN category = 'Program' THEN 1 ELSE 0 END) as total_program")
+            ->selectRaw("SUM(CASE WHEN status = 'Siap Tayang' THEN 1 ELSE 0 END) as total_siap_tayang")
+            ->selectRaw("SUM(CASE WHEN status = 'Sudah Tayang' THEN 1 ELSE 0 END) as total_sudah_tayang")
+            ->selectRaw("SUM(CASE WHEN status = 'Draft' THEN 1 ELSE 0 END) as total_draft")
+            ->selectRaw("SUM(CASE WHEN status = 'Review' THEN 1 ELSE 0 END) as total_review")
+            ->selectRaw("SUM(CASE WHEN status = 'Diarsipkan' THEN 1 ELSE 0 END) as total_diarsipkan")
+            ->selectRaw("SUM(CASE WHEN file_path IS NULL OR file_path = '' THEN 1 ELSE 0 END) as total_without_file")
+            ->selectRaw("SUM(CASE WHEN file_path IS NOT NULL AND file_path != '' THEN 1 ELSE 0 END) as file_ready")
+            ->selectRaw('SUM(COALESCE(duration_seconds, duration_minutes * 60, 0)) as total_duration_seconds')
+            ->selectRaw('AVG(CASE WHEN duration_seconds IS NOT NULL OR duration_minutes IS NOT NULL THEN COALESCE(duration_seconds, duration_minutes * 60, 0) END) as average_duration_seconds')
+            ->selectRaw("AVG(CASE WHEN file_path IS NOT NULL AND file_path != '' THEN file_size END) as average_file_size")
+            ->first();
+
+        return [
+            'total_arsip' => (int) ($row->total_arsip ?? 0),
+            'total_news' => (int) ($row->total_news ?? 0),
+            'total_iklan_layanan_masyarakat' => (int) ($row->total_iklan_layanan_masyarakat ?? 0),
+            'total_program' => (int) ($row->total_program ?? 0),
+            'total_siap_tayang' => (int) ($row->total_siap_tayang ?? 0),
+            'total_sudah_tayang' => (int) ($row->total_sudah_tayang ?? 0),
+            'total_draft' => (int) ($row->total_draft ?? 0),
+            'total_review' => (int) ($row->total_review ?? 0),
+            'total_diarsipkan' => (int) ($row->total_diarsipkan ?? 0),
+            'total_without_file' => (int) ($row->total_without_file ?? 0),
+            'file_ready' => (int) ($row->file_ready ?? 0),
+            'total_duration' => $this->formatSeconds((int) ($row->total_duration_seconds ?? 0)),
+            'average_duration' => $this->formatSeconds((int) round($row->average_duration_seconds ?? 0)),
+            'average_size' => $this->formatBytes((int) round($row->average_file_size ?? 0)),
+        ];
+    }
+
+    private function summaryCardsFromStats(array $stats): array
+    {
+        return [
+            ['label' => 'Total arsip', 'value' => $stats['total_arsip'], 'hint' => 'Semua data yang cocok filter'],
+            ['label' => 'Sudah tayang', 'value' => $stats['total_sudah_tayang'], 'hint' => 'Konten yang sudah aktif'],
+            ['label' => 'Siap tayang', 'value' => $stats['total_siap_tayang'], 'hint' => 'Menunggu jadwal'],
+            ['label' => 'Belum ada file', 'value' => $stats['total_without_file'], 'hint' => 'Hanya link atau metadata'],
+        ];
+    }
+
     private function summaryCards($archives): array
     {
         return [
@@ -193,7 +255,62 @@ class ReportController extends Controller
         ])->values()->all();
     }
 
-    private function reportPayload(Request $request, $archives, array $stats, string $title): array
+    private function categoryBreakdownFromQuery($query): array
+    {
+        $counts = (clone $query)
+            ->selectRaw('category, COUNT(*) as total')
+            ->groupBy('category')
+            ->pluck('total', 'category');
+        $total = max((int) $counts->sum(), 1);
+
+        return collect(VideoArchive::CATEGORIES)->map(fn ($category) => [
+            'label' => $category,
+            'count' => (int) ($counts[$category] ?? 0),
+            'percent' => (int) round(((int) ($counts[$category] ?? 0) / $total) * 100),
+        ])->all();
+    }
+
+    private function statusBreakdownFromQuery($query): array
+    {
+        $counts = (clone $query)
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+        $total = max((int) $counts->sum(), 1);
+
+        return collect(VideoArchive::STATUSES)->map(fn ($status) => [
+            'label' => $status,
+            'count' => (int) ($counts[$status] ?? 0),
+            'percent' => (int) round(((int) ($counts[$status] ?? 0) / $total) * 100),
+        ])->all();
+    }
+
+    private function ageRatingBreakdownFromQuery($query): array
+    {
+        $counts = (clone $query)
+            ->selectRaw('age_rating, COUNT(*) as total')
+            ->groupBy('age_rating')
+            ->pluck('total', 'age_rating');
+        $total = max((int) $counts->sum(), 1);
+
+        return collect(VideoArchive::AGE_RATINGS)->map(function ($label, $code) use ($counts, $total) {
+            $count = (int) ($counts[$code] ?? 0);
+
+            return [
+                'code' => $code,
+                'label' => $label,
+                'count' => $count,
+                'percent' => (int) round(($count / $total) * 100),
+            ];
+        })->push([
+            'code' => '',
+            'label' => 'Belum dipilih',
+            'count' => (int) ($counts[''] ?? 0),
+            'percent' => (int) round(((int) ($counts[''] ?? 0) / $total) * 100),
+        ])->values()->all();
+    }
+
+    private function reportPayload(Request $request, array $stats, string $title, array $categoryBreakdown, array $statusBreakdown, array $ageRatingBreakdown): array
     {
         return [
             'title' => $title,
@@ -239,7 +356,7 @@ class ReportController extends Controller
                     'items' => array_map(function (array $item) {
                         $item['color'] = $this->categoryColor($item['label']);
                         return $item;
-                    }, $this->categoryBreakdown($archives)),
+                    }, $categoryBreakdown),
                 ],
                 [
                     'title' => 'Distribusi Status',
@@ -248,7 +365,7 @@ class ReportController extends Controller
                     'items' => array_map(function (array $item) {
                         $item['color'] = $this->statusColor($item['label']);
                         return $item;
-                    }, $this->statusBreakdown($archives)),
+                    }, $statusBreakdown),
                 ],
                 [
                     'title' => 'Rating Usia',
@@ -257,7 +374,7 @@ class ReportController extends Controller
                     'items' => array_map(function (array $item) {
                         $item['color'] = $this->ageRatingColor($item['code']);
                         return $item;
-                    }, $this->ageRatingBreakdown($archives)),
+                    }, $ageRatingBreakdown),
                 ],
             ],
             'technical' => [

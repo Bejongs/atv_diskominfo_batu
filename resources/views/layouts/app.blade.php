@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>@yield('title', 'ATV Arsip') — Kominfo Kota Batu</title>
+    <title>@yield('title', 'ATV Arsip') - Kominfo Kota Batu</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -24,16 +24,6 @@
                 </span>
                 <span>Dashboard</span>
             </a>
-            @php
-                $sidebarCategoryCounts = \App\Models\VideoArchive::selectRaw('category, count(*) as total')
-                    ->groupBy('category')
-                    ->pluck('total', 'category');
-                $sidebarTotalArchives = $sidebarCategoryCounts->sum();
-                $sidebarActiveCategory = request('category');
-                $sidebarArchiveOpen = request()->routeIs('archives.index')
-                    || request()->routeIs('archives.show')
-                    || request()->routeIs('archives.edit');
-            @endphp
             <details class="sidebar-dropdown" {{ $sidebarArchiveOpen ? 'open' : '' }}>
                 <summary class="{{ $sidebarArchiveOpen ? 'active' : '' }}">
                     <span class="sidebar-icon icon-archive" aria-hidden="true">
@@ -48,7 +38,7 @@
                         <span>Semua Video</span>
                         <strong>{{ $sidebarTotalArchives }}</strong>
                     </a>
-                    @foreach(\App\Models\VideoArchive::CATEGORIES as $category)
+                    @foreach($sidebarCategories as $category)
                         <a class="{{ $sidebarActiveCategory === $category ? 'active' : '' }}" href="{{ route('archives.index', ['category' => $category]) }}">
                             <span class="category-dot {{ str($category)->slug() }}"></span>
                             <span>{{ $category }}</span>
@@ -62,6 +52,12 @@
                     <svg viewBox="0 0 24 24"><path d="M12 4a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5a1 1 0 0 1 1-1Z"/></svg>
                 </span>
                 <span>Upload Video</span>
+            </a>
+            <a class="{{ request()->routeIs('schedules.*') ? 'active' : '' }}" href="{{ route('schedules.index') }}">
+                <span class="sidebar-icon icon-schedule" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M7 3a1 1 0 0 1 1 1v1h8V4a1 1 0 1 1 2 0v1h1.5A2.5 2.5 0 0 1 22 7.5v11A2.5 2.5 0 0 1 19.5 21h-15A2.5 2.5 0 0 1 2 18.5v-11A2.5 2.5 0 0 1 4.5 5H6V4a1 1 0 0 1 1-1Zm13 7H4v8.5a.5.5 0 0 0 .5.5h15a.5.5 0 0 0 .5-.5V10ZM5 7a1 1 0 0 0-1 1v.5h16V8a1 1 0 0 0-1-1H5Zm2.5 5h3v3h-3v-3Zm5 0h3v3h-3v-3Z"/></svg>
+                </span>
+                <span>Jadwal Tayang</span>
             </a>
             <a class="{{ request()->routeIs('reports.*') ? 'active' : '' }}" href="{{ route('reports.index') }}">
                 <span class="sidebar-icon icon-report" aria-hidden="true">
@@ -83,11 +79,51 @@
     <main class="main">
         <header><button class="menu" onclick="document.querySelector('.sidebar')?.classList.toggle('open')">&#9776;</button><div><small>Sistem Manajemen Arsip</small><strong>ATV Diskominfo Kota Batu</strong></div></header>
         <div class="content">
-            @if(session('success'))<div class="alert success">{{ session('success') }}</div>@endif
+            @if(session('success'))<div class="alert success"><strong>Berhasil</strong><span>{{ session('success') }}</span></div>@endif
+            @if($errors->any())<div class="alert danger"><strong>Periksa kembali</strong><span>Ada data yang belum sesuai. Koreksi bagian yang ditandai merah.</span></div>@endif
             @yield('content')
         </div>
     </main>
 </div>
+<script>
+(() => {
+    const loadingText = (button) => {
+        const text = button.textContent.trim().toLowerCase();
+
+        if (text.includes('upload')) return 'Mengupload...';
+        if (text.includes('generate') || text.includes('export')) return 'Membuat laporan...';
+        if (text.includes('terapkan')) return 'Menerapkan...';
+        if (text.includes('hapus')) return 'Menghapus...';
+        if (text.includes('keluar')) return 'Keluar...';
+
+        return 'Menyimpan...';
+    };
+
+    document.addEventListener('submit', (event) => {
+        const form = event.target;
+
+        if (!(form instanceof HTMLFormElement) || form.dataset.loadingHandled === 'true') return;
+
+        const submitter = event.submitter || form.querySelector('button[type="submit"], button:not([type]), input[type="submit"]');
+        if (!submitter || submitter.dataset.noLoading === 'true') return;
+
+        form.dataset.loadingHandled = 'true';
+        form.classList.add('is-submitting');
+
+        const buttons = form.querySelectorAll('button, .btn');
+        buttons.forEach((button) => {
+            if (button.tagName === 'BUTTON') button.disabled = true;
+            button.classList.add('is-disabled');
+        });
+
+        if (submitter.tagName === 'BUTTON') {
+            submitter.dataset.originalText = submitter.innerHTML;
+            submitter.innerHTML = `<span class="btn-spinner" aria-hidden="true"></span><span>${loadingText(submitter)}</span>`;
+            submitter.classList.add('is-loading');
+        }
+    }, true);
+})();
+</script>
 </body>
 </html>
 

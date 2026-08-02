@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\VideoArchiveController;
 use Illuminate\Support\Facades\Route;
 
@@ -23,8 +24,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/arsip/deteksi-kategori', [VideoArchiveController::class, 'detectCategory'])->name('archives.detect-category');
     Route::get('/arsip/export', [VideoArchiveController::class, 'export'])->name('archives.export');
     Route::get('/upload', [VideoArchiveController::class, 'create'])->name('archives.upload');
+    Route::get('/jadwal-tayang', ScheduleController::class)->name('schedules.index');
     Route::get('/laporan', [ReportController::class, 'index'])->name('reports.index');
     Route::post('/laporan/export', [ReportController::class, 'export'])->name('reports.export');
+    Route::post('/arsip/bulk-action', [VideoArchiveController::class, 'bulkAction'])->name('archives.bulk-action');
     Route::get('/arsip/{archive}/thumbnail', [VideoArchiveController::class, 'thumbnail'])->name('archives.thumbnail');
     Route::get('/arsip/{archive}/preview', [VideoArchiveController::class, 'preview'])->name('archives.preview');
     Route::get('/arsip/{archive}/unduh', [VideoArchiveController::class, 'download'])->name('archives.download');

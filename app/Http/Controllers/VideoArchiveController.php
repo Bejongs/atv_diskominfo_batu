@@ -55,6 +55,7 @@ class VideoArchiveController extends Controller
                 $this->logActivity($archive, $request->user()->id, 'created', [
                     'original_name' => null,
                     'bulk' => false,
+                    'snapshot' => $this->snapshotArchive($archive),
                 ]);
                 $createdCount++;
 
@@ -78,6 +79,7 @@ class VideoArchiveController extends Controller
                 $this->logActivity($archive, $request->user()->id, 'created', [
                     'original_name' => $file->getClientOriginalName(),
                     'bulk' => count($files) > 1,
+                    'snapshot' => $this->snapshotArchive($archive),
                 ]);
                 $createdCount++;
             }
@@ -89,10 +91,57 @@ class VideoArchiveController extends Controller
     public function show(VideoArchive $archive) { return view('archives.show', compact('archive')); }
     public function edit(VideoArchive $archive) { return view('archives.edit', compact('archive')); }
 
+    public function bulkAction(Request $request)
+    {
+        $data = $request->validate([
+            'selected' => ['required', 'array', 'min:1'],
+            'selected.*' => ['integer', 'distinct', 'exists:video_archives,id'],
+            'action' => ['required', Rule::in(['change_status', 'delete'])],
+            'status' => ['required_if:action,change_status', Rule::in(VideoArchive::STATUSES)],
+        ]);
+
+        $archives = VideoArchive::whereIn('id', $data['selected'])->get();
+
+        DB::transaction(function () use ($archives, $data, $request): void {
+            foreach ($archives as $archive) {
+                if ($data['action'] === 'delete') {
+                    if ($archive->file_path) {
+                        Storage::disk('public')->delete($archive->file_path);
+                    }
+
+                    if ($archive->thumbnail_path) {
+                        Storage::disk('public')->delete($archive->thumbnail_path);
+                    }
+
+                    $this->logActivity($archive, $request->user()->id, 'deleted', [
+                        'snapshot' => $this->snapshotArchive($archive),
+                    ]);
+                    $archive->delete();
+
+                    continue;
+                }
+
+                $before = $this->snapshotArchive($archive);
+                $archive->update(['status' => $data['status']]);
+                $this->logActivity($archive, $request->user()->id, 'updated', [
+                    'changes' => $this->buildChangeSet($before, $this->snapshotArchive($archive)),
+                ]);
+            }
+        });
+
+        $count = $archives->count();
+
+        if ($data['action'] === 'delete') {
+            return redirect()->route('archives.index')->with('success', $count.' arsip berhasil dihapus.');
+        }
+
+        return redirect()->route('archives.index')->with('success', $count.' arsip berhasil diubah ke status '.$data['status'].'.');
+    }
+
     public function update(Request $request, VideoArchive $archive)
     {
         $data = $this->validated($request, false, false);
-        $before = $archive->only(['title', 'category', 'issue', 'age_rating', 'status', 'air_date', 'air_time', 'video_url', 'duration_minutes', 'duration_seconds']);
+        $before = $this->snapshotArchive($archive);
         if ($request->hasFile('video')) {
             Storage::disk('public')->delete($archive->file_path);
             Storage::disk('public')->delete($archive->thumbnail_path);
@@ -108,8 +157,7 @@ class VideoArchiveController extends Controller
         unset($data['video'], $data['duration_hours'], $data['duration_minute_part'], $data['duration_second_part'], $data['duration_seconds_per_file']);
         $archive->update($data);
         $this->logActivity($archive, $request->user()->id, 'updated', [
-            'before' => $before,
-            'after' => $archive->only(['title', 'category', 'issue', 'age_rating', 'status', 'air_date', 'air_time', 'video_url', 'duration_minutes', 'duration_seconds']),
+            'changes' => $this->buildChangeSet($before, $this->snapshotArchive($archive)),
         ]);
         return redirect()->route('archives.show', $archive)->with('success', 'Data arsip berhasil diperbarui.');
     }
@@ -124,9 +172,7 @@ class VideoArchiveController extends Controller
             Storage::disk('public')->delete($archive->thumbnail_path);
         }
         $this->logActivity($archive, auth()->id(), 'deleted', [
-            'title' => $archive->title,
-            'category' => $archive->category,
-            'issue' => $archive->issue,
+            'snapshot' => $this->snapshotArchive($archive),
         ]);
         $archive->delete();
         return redirect()->route('archives.index')->with('success', 'Arsip berhasil dihapus.');
@@ -369,6 +415,119 @@ SVG;
   <text x="470" y="300" fill="#f5f7ff" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="500">KOVER VIDEO</text>
 </svg>
 SVG;
+    }
+
+    private function snapshotArchive(VideoArchive $archive): array
+    {
+        return [
+            'title' => $archive->title,
+            'description' => $archive->description,
+            'category' => $archive->category,
+            'issue' => $archive->issue,
+            'age_rating' => $archive->age_rating,
+            'status' => $archive->status,
+            'air_date' => $archive->air_date?->format('Y-m-d'),
+            'air_time' => $archive->air_time ? substr((string) $archive->air_time, 0, 5) : null,
+            'video_url' => $archive->video_url,
+            'duration_seconds' => $archive->duration_seconds,
+            'file_path' => $archive->file_path,
+            'thumbnail_path' => $archive->thumbnail_path,
+            'original_name' => $archive->original_name,
+            'mime_type' => $archive->mime_type,
+            'file_size' => $archive->file_size,
+        ];
+    }
+
+    private function buildChangeSet(array $before, array $after): array
+    {
+        $labels = [
+            'title' => 'Judul',
+            'description' => 'Deskripsi',
+            'category' => 'Kategori',
+            'issue' => 'Issue',
+            'age_rating' => 'Rating usia',
+            'status' => 'Status',
+            'air_date' => 'Tanggal tayang',
+            'air_time' => 'Jam tayang',
+            'video_url' => 'Link video',
+            'duration_seconds' => 'Durasi',
+            'file_path' => 'File video',
+            'thumbnail_path' => 'Thumbnail',
+            'original_name' => 'Nama file',
+            'mime_type' => 'Tipe file',
+            'file_size' => 'Ukuran file',
+        ];
+
+        return collect($before)
+            ->filter(function ($value, string $field) use ($after): bool {
+                return $this->normalizeAuditValue($value) !== $this->normalizeAuditValue($after[$field] ?? null);
+            })
+            ->map(function ($value, string $field) use ($after, $labels): array {
+                return [
+                    'field' => $field,
+                    'label' => $labels[$field] ?? Str::headline($field),
+                    'before' => $this->formatAuditValue($field, $value),
+                    'after' => $this->formatAuditValue($field, $after[$field] ?? null),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function normalizeAuditValue(mixed $value): mixed
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d H:i:s');
+        }
+
+        return $value;
+    }
+
+    private function formatAuditValue(string $field, mixed $value): string
+    {
+        return match ($field) {
+            'age_rating' => $value ? (VideoArchive::AGE_RATINGS[$value] ?? $value) : 'Kosong',
+            'air_date' => $value ? \Illuminate\Support\Carbon::parse($value)->format('d M Y') : 'Kosong',
+            'air_time' => $value ? substr((string) $value, 0, 5) : 'Kosong',
+            'duration_seconds' => $value ? $this->formatDurationSeconds((int) $value) : 'Kosong',
+            'file_size' => $value ? $this->formatBytes((int) $value) : 'Kosong',
+            default => $value !== null && $value !== '' ? (string) $value : 'Kosong',
+        };
+    }
+
+    private function formatDurationSeconds(int $seconds): string
+    {
+        $hours = intdiv($seconds, 3600);
+        $minutes = intdiv($seconds % 3600, 60);
+        $remaining = $seconds % 60;
+        $parts = [];
+
+        if ($hours > 0) {
+            $parts[] = $hours.' jam';
+        }
+
+        if ($minutes > 0) {
+            $parts[] = $minutes.' menit';
+        }
+
+        if ($remaining > 0 || $parts === []) {
+            $parts[] = $remaining.' detik';
+        }
+
+        return implode(' ', $parts);
+    }
+
+    private function formatBytes(int $bytes): string
+    {
+        foreach (['B', 'KB', 'MB', 'GB'] as $unit) {
+            if ($bytes < 1024 || $unit === 'GB') {
+                return number_format($bytes, $unit === 'B' ? 0 : 1).' '.$unit;
+            }
+
+            $bytes /= 1024;
+        }
+
+        return $bytes.' B';
     }
 
     private function logActivity(VideoArchive $archive, int $userId, string $action, array $meta = []): void

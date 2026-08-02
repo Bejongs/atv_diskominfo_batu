@@ -169,7 +169,7 @@
     </div>
 
         <div class="form-actions form-actions-inline">
-            <a class="btn" href="{{ $editing ? route('archives.show',$archive) : route('archives.index') }}">Batal</a>
+            <a class="btn" data-cancel-upload href="{{ $editing ? route('archives.show',$archive) : route('archives.index') }}">Batal</a>
             <button class="btn primary">{{ $editing ? 'Simpan Perubahan' : 'Upload dan Simpan' }}</button>
         </div>
     </div>
@@ -199,13 +199,17 @@
     let timer;
     let previewUrls = [];
     let isSubmitting = false;
+    let pendingVideoSelected = (videoInput?.files?.length || 0) > 0;
 
     function hasSelectedVideo() {
-        return (videoInput?.files?.length || 0) > 0;
+        return pendingVideoSelected && (videoInput?.files?.length || 0) > 0;
     }
 
     function showNavigationWarning() {
         if (navigationWarning) {
+            navigationWarning.classList.remove('success');
+            navigationWarning.classList.add('warning');
+            navigationWarning.textContent = blockedNavigationMessage;
             navigationWarning.hidden = false;
             navigationWarning.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
@@ -252,8 +256,8 @@
             const data = await response.json();
             category.value = data.category;
             issue.value = data.issue;
-            categoryResult.textContent = `Otomatis: ${data.category} · keyakinan ${data.confidence}. ${data.reason}`;
-            issueResult.textContent = `Otomatis: ${data.issue} · keyakinan ${data.issue_confidence}. ${data.issue_reason}`;
+            categoryResult.textContent = `Otomatis: ${data.category} - keyakinan ${data.confidence}. ${data.reason}`;
+            issueResult.textContent = `Otomatis: ${data.issue} - keyakinan ${data.issue_confidence}. ${data.issue_reason}`;
         } catch (_) {
             categoryResult.textContent = 'Kategori otomatis gagal. Silakan pilih secara manual.';
             issueResult.textContent = 'Issue otomatis gagal. Silakan pilih secara manual.';
@@ -275,6 +279,23 @@
         if (durationHiddenFields) durationHiddenFields.innerHTML = '';
         if (previewWrap) previewWrap.hidden = true;
         if (navigationWarning) navigationWarning.hidden = true;
+    }
+
+    function clearSelectedVideo() {
+        pendingVideoSelected = false;
+        if (videoInput) videoInput.value = '';
+        clearPreviews();
+        closeNavigationWarning();
+    }
+
+    function showCancelFeedback() {
+        if (!navigationWarning) return;
+
+        navigationWarning.classList.remove('warning');
+        navigationWarning.classList.add('success');
+        navigationWarning.textContent = 'Upload dibatalkan. Video yang dipilih sudah dihapus.';
+        navigationWarning.hidden = false;
+        navigationWarning.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     function formatDuration(totalSeconds) {
@@ -313,6 +334,8 @@
     function updatePreviews() {
         clearPreviews();
         const files = Array.from(videoInput.files || []);
+        pendingVideoSelected = files.length > 0;
+
         if (!files.length || !previewList || !previewWrap) return;
 
         files.forEach((file) => {
@@ -368,9 +391,14 @@
     }
 
     videoInput?.addEventListener('change', updatePreviews);
+    if (!hasSelectedVideo()) {
+        clearPreviews();
+        closeNavigationWarning();
+    }
 
     archiveForm?.addEventListener('submit', () => {
         isSubmitting = true;
+        pendingVideoSelected = false;
     });
 
     navigationModalOk?.addEventListener('click', closeNavigationWarning);
@@ -382,6 +410,20 @@
     });
 
     document.addEventListener('click', (event) => {
+        const cancelLink = event.target.closest('[data-cancel-upload]');
+        if (cancelLink) {
+            if (!hasSelectedVideo()) return;
+
+            event.preventDefault();
+            clearSelectedVideo();
+            showCancelFeedback();
+            window.setTimeout(() => {
+                window.location.href = cancelLink.href;
+            }, 550);
+
+            return;
+        }
+
         if (!hasSelectedVideo()) return;
 
         const link = event.target.closest('a');
