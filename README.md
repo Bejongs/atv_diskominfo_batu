@@ -1,66 +1,432 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
-
 <p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
+  <img src="public/images/atv-logo-transparent.png" alt="ATV Logo" width="150">
 </p>
 
-## About Laravel
+<h1 align="center">ATV Arsip</h1>
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+<p align="center">
+  Sistem pengelolaan arsip video untuk ATV Diskominfo Kota Batu.
+  <br>
+  Dibangun dengan Laravel 12, Blade, Tailwind CSS 4, Vite, dan MySQL.
+</p>
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+<p align="center">
+  <img src="https://img.shields.io/badge/Laravel-12-FF2D20?style=flat-square&logo=laravel&logoColor=white" alt="Laravel 12">
+  <img src="https://img.shields.io/badge/PHP-8.2+-777BB4?style=flat-square&logo=php&logoColor=white" alt="PHP 8.2+">
+  <img src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white" alt="Tailwind CSS 4">
+  <img src="https://img.shields.io/badge/Vite-6-646CFF?style=flat-square&logo=vite&logoColor=white" alt="Vite 6">
+</p>
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+---
 
-## Learning Laravel
+## Tentang Project
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+**ATV Arsip** adalah aplikasi internal untuk mengelola dokumentasi video ATV Diskominfo Batu, mulai dari upload arsip, metadata siaran, kategorisasi konten, jadwal tayang, status workflow, riwayat aktivitas, sampai ekspor laporan.
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+Aplikasi ini dirancang agar tim dapat menjaga arsip video tetap rapi, mudah dicari, siap dipantau, dan bisa dilaporkan dalam format yang siap dibagikan.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Fitur Utama
 
-## Laravel Sponsors
+| Modul | Deskripsi |
+| --- | --- |
+| Dashboard | Ringkasan total arsip, konten siap tayang, sudah tayang, ukuran file, tren upload, distribusi kategori, workflow status, dan aktivitas terbaru. |
+| Manajemen Arsip | CRUD arsip video dengan metadata lengkap, file video opsional, link video, thumbnail otomatis, durasi, kategori, issue, rating usia, dan jadwal tayang. |
+| Upload Multi File | Mendukung upload beberapa video sekaligus dengan judul otomatis per file. |
+| Deteksi Kategori | Rekomendasi kategori dan issue berbasis keyword dari judul serta deskripsi. |
+| Preview dan Download | Video dapat dipreview inline atau diunduh kembali dari storage publik Laravel. |
+| Bulk Action | Ubah status banyak arsip sekaligus atau hapus arsip terpilih. |
+| Jadwal Tayang | Kalender tayang bulanan, daftar tayang hari ini, upcoming schedule, dan arsip tanpa jadwal. |
+| Laporan | Statistik arsip berdasarkan filter kategori, issue, status, rating usia, dan periode tayang. |
+| Ekspor Data | Export arsip dan laporan ke format XLSX atau PDF melalui exporter internal sederhana. |
+| Audit Aktivitas | Riwayat create, update, delete, dan auto update status tersimpan di tabel aktivitas. |
+| Profil Pengguna | Lihat kontribusi arsip pengguna, edit nama, email, dan password. |
+| Autentikasi | Login, logout, dan proteksi route berbasis session Laravel. |
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## Tech Stack
 
-### Premium Partners
+| Layer | Teknologi |
+| --- | --- |
+| Backend | Laravel 12, PHP 8.2+ |
+| Frontend | Blade, Tailwind CSS 4, Vite |
+| Database | MySQL, compatible dengan database Laravel lain jika konfigurasi disesuaikan |
+| Storage | Laravel filesystem public disk |
+| Testing | PHPUnit 11 |
+| Formatting | Laravel Pint |
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+## Struktur Aplikasi
 
-## Contributing
+```text
+app/
+  Console/Commands/
+    SyncVideoArchiveStatuses.php     # Command auto update status tayang
+  Http/Controllers/
+    AuthController.php               # Login dan logout
+    DashboardController.php          # Statistik dashboard
+    VideoArchiveController.php       # CRUD, upload, preview, export arsip
+    ScheduleController.php           # Kalender jadwal tayang
+    ReportController.php             # Statistik dan export laporan
+    ProfileController.php            # Profil pengguna
+  Models/
+    VideoArchive.php                 # Entity arsip video
+    VideoArchiveActivity.php         # Log aktivitas arsip
+    User.php                         # Pengguna aplikasi
+  Services/
+    CategoryDetector.php             # Deteksi kategori dan issue berbasis keyword
+    VideoArchiveStatusSyncer.php     # Sinkronisasi status Siap Tayang ke Sudah Tayang
+  Support/
+    SimplePdfExporter.php            # Generator PDF internal
+    SimpleXlsxExporter.php           # Generator XLSX internal
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+database/
+  migrations/                        # Skema users, jobs, cache, arsip, aktivitas
+  seeders/DatabaseSeeder.php         # User admin awal
 
-## Code of Conduct
+resources/
+  views/                             # Blade views untuk auth, dashboard, arsip, laporan, jadwal, profil
+  css/app.css                        # Entry CSS Tailwind
+  js/app.js                          # Entry JS Vite
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+routes/
+  web.php                            # Route web aplikasi
+```
 
-## Security Vulnerabilities
+## Model Data
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### `video_archives`
 
-## License
+Menyimpan arsip utama dengan informasi:
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- Pengunggah (`user_id`)
+- Judul dan deskripsi
+- Kategori: `News`, `Iklan Layanan Masyarakat`, `Program`
+- Issue: `Ekonomi`, `Lingkungan`, `Sosial`
+- Rating usia: `SU`, `A`, `R`, `D`
+- Status workflow: `Draft`, `Review`, `Siap Tayang`, `Sudah Tayang`, `Diarsipkan`
+- Jadwal tayang: tanggal dan jam tayang
+- File video lokal atau URL video eksternal
+- Thumbnail SVG otomatis
+- Durasi, nama file asli, MIME type, dan ukuran file
+
+### `video_archive_activities`
+
+Mencatat aktivitas penting pada arsip:
+
+- `created`
+- `updated`
+- `deleted`
+- `auto_status_updated`
+
+Metadata aktivitas disimpan dalam bentuk JSON sehingga perubahan data dapat ditampilkan ulang secara fleksibel.
+
+## Alur Kerja Arsip
+
+```text
+Draft
+  -> Review
+  -> Siap Tayang
+  -> Sudah Tayang
+  -> Diarsipkan
+```
+
+Ketika arsip berstatus **Siap Tayang** dan jadwal tayangnya sudah lewat, sistem dapat mengubah status otomatis menjadi **Sudah Tayang** melalui service `VideoArchiveStatusSyncer`.
+
+Sinkronisasi status dipanggil pada:
+
+- Halaman dashboard
+- Halaman daftar arsip
+- Command artisan `archives:sync-statuses`
+
+## Route Penting
+
+| Method | Path | Nama Route | Fungsi |
+| --- | --- | --- | --- |
+| GET | `/` | - | Redirect ke dashboard |
+| GET | `/login` | `login` | Form login |
+| POST | `/login` | `login.store` | Proses login |
+| POST | `/logout` | `logout` | Logout |
+| GET | `/dashboard` | `dashboard` | Dashboard utama |
+| GET | `/profil` | `profile` | Profil pengguna |
+| GET | `/profil/edit` | `profile.edit` | Edit profil |
+| PUT | `/profil` | `profile.update` | Update profil |
+| GET | `/arsip` | `archives.index` | Daftar arsip |
+| GET | `/upload` | `archives.upload` | Form upload arsip |
+| POST | `/arsip` | `archives.store` | Simpan arsip |
+| GET | `/arsip/{archive}` | `archives.show` | Detail arsip |
+| GET | `/arsip/{archive}/edit` | `archives.edit` | Edit arsip |
+| PUT/PATCH | `/arsip/{archive}` | `archives.update` | Update arsip |
+| DELETE | `/arsip/{archive}` | `archives.destroy` | Hapus arsip |
+| POST | `/arsip/bulk-action` | `archives.bulk-action` | Bulk update atau delete |
+| GET | `/arsip/export` | `archives.export` | Export arsip XLSX/PDF |
+| POST | `/arsip/deteksi-kategori` | `archives.detect-category` | Deteksi kategori dan issue |
+| GET | `/arsip/{archive}/preview` | `archives.preview` | Preview file video |
+| GET | `/arsip/{archive}/unduh` | `archives.download` | Download file video |
+| GET | `/arsip/{archive}/thumbnail` | `archives.thumbnail` | Render thumbnail SVG |
+| GET | `/jadwal-tayang` | `schedules.index` | Kalender jadwal tayang |
+| GET | `/laporan` | `reports.index` | Dashboard laporan |
+| POST | `/laporan/export` | `reports.export` | Export laporan XLSX/PDF |
+
+> Semua route utama kecuali login berada di dalam middleware `auth`.
+
+## Requirement
+
+Pastikan environment lokal sudah memiliki:
+
+- PHP `8.2` atau lebih baru
+- Composer
+- Node.js dan npm
+- MySQL atau database lain yang didukung Laravel
+- Extension PHP umum untuk Laravel: `openssl`, `pdo`, `mbstring`, `tokenizer`, `xml`, `ctype`, `json`, `fileinfo`
+
+## Instalasi Lokal
+
+Clone repository, lalu masuk ke folder project.
+
+```bash
+git clone <repository-url>
+cd atv_diskominfo_batu
+```
+
+Install dependency PHP dan JavaScript.
+
+```bash
+composer install
+npm install
+```
+
+Salin file environment.
+
+```bash
+cp .env.example .env
+```
+
+Untuk PowerShell/Windows:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Generate application key.
+
+```bash
+php artisan key:generate
+```
+
+Atur konfigurasi database di `.env`.
+
+```env
+APP_NAME="ATV Arsip"
+APP_URL=http://127.0.0.1:8000
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=atv_diskominfo_batu
+DB_USERNAME=root
+DB_PASSWORD=
+
+FILESYSTEM_DISK=public
+QUEUE_CONNECTION=database
+```
+
+Jalankan migration dan seeder.
+
+```bash
+php artisan migrate --seed
+```
+
+Buat symbolic link storage agar file upload bisa diakses dari public.
+
+```bash
+php artisan storage:link
+```
+
+Jalankan aplikasi.
+
+```bash
+composer run dev
+```
+
+Atau jalankan server backend dan frontend secara terpisah.
+
+```bash
+php artisan serve
+npm run dev
+```
+
+Default akses lokal:
+
+```text
+http://127.0.0.1:8000
+```
+
+## Akun Awal
+
+Seeder membuat satu akun administrator:
+
+```text
+Email    : admin@atv.test
+Password : password
+```
+
+Segera ubah password setelah login pertama melalui halaman profil.
+
+## Command Operasional
+
+Sinkronisasi status video yang jadwal tayangnya sudah tercapai:
+
+```bash
+php artisan archives:sync-statuses
+```
+
+Build asset produksi:
+
+```bash
+npm run build
+```
+
+Format kode PHP:
+
+```bash
+vendor/bin/pint
+```
+
+Jalankan test:
+
+```bash
+php artisan test
+```
+
+## File Upload
+
+Aplikasi menyimpan file video pada disk `public` Laravel. Setelah menjalankan `php artisan storage:link`, file di `storage/app/public` dapat diakses melalui `public/storage`.
+
+Validasi upload saat ini:
+
+- Format video: MP4, MPEG, MOV, AVI, WebM
+- Ukuran maksimal: 500 MB per file
+- File video boleh kosong jika arsip hanya memakai metadata atau link video
+
+## Export
+
+Tersedia dua jenis export:
+
+| Export | Format | Catatan |
+| --- | --- | --- |
+| Arsip Video | XLSX, PDF | Berisi daftar arsip sesuai filter aktif. |
+| Laporan | XLSX, PDF | Berisi ringkasan statistik, distribusi kategori, status, rating usia, dan detail arsip. |
+
+Exporter dibuat di dalam project melalui:
+
+- `app/Support/SimpleXlsxExporter.php`
+- `app/Support/SimplePdfExporter.php`
+
+Dengan pendekatan ini, project tidak bergantung pada package eksternal khusus untuk export sederhana.
+
+## Testing
+
+Test feature yang tersedia:
+
+- `tests/Feature/ArchiveManagementTest.php`
+- `tests/Feature/ReportManagementTest.php`
+
+Jalankan semua test:
+
+```bash
+php artisan test
+```
+
+Jalankan test tertentu:
+
+```bash
+php artisan test --filter=ArchiveManagementTest
+php artisan test --filter=ReportManagementTest
+```
+
+## Troubleshooting
+
+### File upload tidak muncul
+
+Pastikan symbolic link storage sudah dibuat.
+
+```bash
+php artisan storage:link
+```
+
+Pastikan `.env` menggunakan disk yang benar.
+
+```env
+FILESYSTEM_DISK=public
+```
+
+### Login gagal setelah fresh install
+
+Jalankan seeder ulang.
+
+```bash
+php artisan migrate:fresh --seed
+```
+
+Gunakan akun:
+
+```text
+admin@atv.test
+password
+```
+
+### Asset CSS atau JS tidak berubah
+
+Jalankan Vite.
+
+```bash
+npm run dev
+```
+
+Untuk produksi, build ulang asset.
+
+```bash
+npm run build
+```
+
+### Status tidak otomatis berubah ke Sudah Tayang
+
+Jalankan command sinkronisasi.
+
+```bash
+php artisan archives:sync-statuses
+```
+
+Jika ingin otomatis periodik di server produksi, tambahkan Laravel scheduler pada cron server:
+
+```bash
+* * * * * cd /path/to/project && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Lalu daftarkan command `archives:sync-statuses` ke scheduler jika diperlukan.
+
+## Deployment Checklist
+
+- Set `.env` produksi dengan `APP_ENV=production` dan `APP_DEBUG=false`
+- Pastikan database produksi sudah dibuat
+- Jalankan `composer install --no-dev --optimize-autoloader`
+- Jalankan `php artisan key:generate` jika belum ada `APP_KEY`
+- Jalankan `php artisan migrate --force`
+- Jalankan `php artisan storage:link`
+- Jalankan `npm ci` dan `npm run build`
+- Jalankan optimasi Laravel:
+
+```bash
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+## Catatan Pengembangan
+
+- Gunakan model `VideoArchive` sebagai sumber nilai enum kategori, issue, status, dan rating usia agar konsisten di controller dan view.
+- Semua perubahan arsip yang penting sebaiknya dicatat ke `VideoArchiveActivity`.
+- Jika menambah filter baru di arsip atau laporan, pastikan export XLSX/PDF mengikuti filter yang sama.
+- Jika menambah status workflow baru, perbarui `VideoArchive::STATUSES`, warna/status breakdown di `ReportController`, dan logika `VideoArchiveStatusSyncer` bila relevan.
+
+## Lisensi
+
+Project ini menggunakan fondasi Laravel yang berlisensi MIT. Kebijakan lisensi untuk kode aplikasi internal mengikuti aturan pemilik repository.
