@@ -17,8 +17,8 @@ class DatabaseSeeder extends Seeder
 
         User::factory()->create([
             'name' => 'Administrator ATV',
-            'email' => 'admin@atv.test',
-            'password' => 'password',
+            'email' => 'admin@atv.kominfo',
+            'password' => 'atv12345',
         ]);
     }
 }

@@ -264,11 +264,47 @@ http://127.0.0.1:8000
 Seeder membuat satu akun administrator:
 
 ```text
-Email    : admin@atv.test
-Password : password
+Email    : admin@atv.kominfo
+Password : atv12345
 ```
 
 Segera ubah password setelah login pertama melalui halaman profil.
+
+## Screenshot
+
+Tampilan aplikasi dibuat sebagai dashboard operasional yang bersih, kontras, dan mudah dipindai oleh admin.
+
+### Login
+
+![Login ATV Arsip](public/images/docs/login.png)
+
+### Dashboard
+
+![Dashboard ATV Arsip](public/images/docs/dashboard.png)
+
+### Manajemen Arsip
+
+![Daftar Arsip ATV](public/images/docs/archives.png)
+
+### Upload Arsip
+
+![Upload Arsip ATV](public/images/docs/upload.png)
+
+### Detail Arsip
+
+![Detail Arsip ATV](public/images/docs/detail.png)
+
+### Jadwal Tayang
+
+![Jadwal Tayang ATV](public/images/docs/schedules.png)
+
+### Laporan
+
+![Laporan ATV Arsip](public/images/docs/laporan.png)
+
+### Profil
+
+![Profil Pengguna ATV Arsip](public/images/docs/profil.png)
 
 ## Command Operasional
 
@@ -276,6 +312,18 @@ Sinkronisasi status video yang jadwal tayangnya sudah tercapai:
 
 ```bash
 php artisan archives:sync-statuses
+```
+
+Pulihkan arsip dari file thumbnail dan video yang masih tersisa di storage:
+
+```bash
+php artisan archives:recover-from-storage
+```
+
+Preview data recovery tanpa insert ke database:
+
+```bash
+php artisan archives:recover-from-storage --dry-run
 ```
 
 Build asset produksi:
@@ -321,6 +369,137 @@ Exporter dibuat di dalam project melalui:
 - `app/Support/SimplePdfExporter.php`
 
 Dengan pendekatan ini, project tidak bergantung pada package eksternal khusus untuk export sederhana.
+
+## Backup dan Restore
+
+Backup database wajib dilakukan sebelum menjalankan command yang berpotensi mengubah struktur atau isi database, terutama:
+
+- `php artisan migrate:fresh`
+- `php artisan migrate:refresh`
+- import database baru
+- perubahan migration besar
+
+### Backup MySQL
+
+```bash
+mysqldump -u root atv_arsip > backup_atv_arsip.sql
+```
+
+Jika database memakai password:
+
+```bash
+mysqldump -u root -p atv_arsip > backup_atv_arsip.sql
+```
+
+Contoh backup dengan timestamp di PowerShell:
+
+```powershell
+mysqldump -u root atv_arsip > "backup_atv_arsip_$(Get-Date -Format yyyyMMdd_HHmmss).sql"
+```
+
+### Restore MySQL
+
+```bash
+mysql -u root atv_arsip < backup_atv_arsip.sql
+```
+
+Jika memakai password:
+
+```bash
+mysql -u root -p atv_arsip < backup_atv_arsip.sql
+```
+
+### Backup File Upload
+
+Database hanya menyimpan path file. File video dan thumbnail tetap perlu dibackup dari:
+
+```text
+storage/app/public
+```
+
+Untuk backup manual, salin folder tersebut bersama file dump database.
+
+## Recovery dari Storage
+
+Project menyediakan command darurat untuk merekonstruksi data arsip dari file yang masih ada di `storage/app/public`.
+
+```bash
+php artisan archives:recover-from-storage
+```
+
+Command ini membaca:
+
+- Thumbnail SVG dari `storage/app/public/thumbnails`
+- Video dari `storage/app/public/videos`
+- Judul, kategori, dan issue dari teks yang tersimpan di thumbnail
+- Ukuran file dan MIME type dari file video
+
+Command ini aman untuk dijalankan ulang karena akan melewati arsip yang sudah punya `thumbnail_path` atau `file_path` yang sama.
+
+Gunakan mode preview sebelum recovery:
+
+```bash
+php artisan archives:recover-from-storage --dry-run
+```
+
+Batasan recovery:
+
+- Deskripsi asli tidak bisa dipulihkan dari storage
+- Status asli tidak bisa dipastikan
+- Tanggal dan jam tayang asli tidak tersedia
+- Rating usia asli tidak tersedia
+- Nama file asli upload tidak tersedia jika database sebelumnya hilang
+- Activity log lama tidak bisa dikembalikan tanpa backup database
+
+Data hasil recovery dibuat dengan nilai default:
+
+| Field | Nilai Default |
+| --- | --- |
+| `status` | `Draft` |
+| `description` | `Dipulihkan dari file storage setelah database ter-reset.` |
+| `age_rating` | `null` |
+| `air_date` | `null` |
+| `air_time` | `null` |
+| `original_name` | Nama file storage saat ini |
+
+Setelah recovery, lengkapi kembali metadata yang hilang melalui halaman edit arsip.
+
+## Scheduler
+
+Command `archives:sync-statuses` dapat dijalankan manual, tetapi untuk produksi sebaiknya dipanggil otomatis oleh Laravel scheduler.
+
+Tambahkan scheduler di `routes/console.php`:
+
+```php
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command('archives:sync-statuses')->everyMinute();
+```
+
+Lalu aktifkan cron server:
+
+```bash
+* * * * * cd /path/to/project && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Untuk Windows Task Scheduler atau Laragon lokal, buat task yang menjalankan:
+
+```powershell
+php artisan schedule:run
+```
+
+Pastikan task dijalankan dari folder project.
+
+## Keamanan
+
+- Ubah password default setelah instalasi pertama.
+- Jangan memakai akun seed default untuk produksi jangka panjang.
+- Set `APP_DEBUG=false` di server produksi.
+- Pastikan `.env` tidak pernah masuk repository.
+- Batasi akses server hanya untuk pengguna internal yang berwenang.
+- Backup database dan `storage/app/public` secara rutin.
+- Validasi ukuran upload server web agar selaras dengan batas aplikasi 500 MB per file.
+- Gunakan HTTPS jika aplikasi diakses melalui jaringan publik.
 
 ## Testing
 
@@ -369,8 +548,8 @@ php artisan migrate:fresh --seed
 Gunakan akun:
 
 ```text
-admin@atv.test
-password
+admin@atv.kominfo
+atv12345
 ```
 
 ### Asset CSS atau JS tidak berubah
@@ -395,13 +574,7 @@ Jalankan command sinkronisasi.
 php artisan archives:sync-statuses
 ```
 
-Jika ingin otomatis periodik di server produksi, tambahkan Laravel scheduler pada cron server:
-
-```bash
-* * * * * cd /path/to/project && php artisan schedule:run >> /dev/null 2>&1
-```
-
-Lalu daftarkan command `archives:sync-statuses` ke scheduler jika diperlukan.
+Jika ingin otomatis periodik di server produksi, ikuti bagian **Scheduler**.
 
 ## Deployment Checklist
 
