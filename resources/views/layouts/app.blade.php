@@ -71,6 +71,14 @@
                 </span>
                 <span>Profil</span>
             </a>
+            @if(auth()->user()?->isSuperAdmin())
+                <a class="{{ request()->routeIs('admin.users.*') ? 'active' : '' }}" href="{{ route('admin.users.index') }}">
+                    <span class="sidebar-icon icon-user" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7.5 8.5c.8-3.1 3.8-5.5 7.5-5.5s6.7 2.4 7.5 5.5a1.2 1.2 0 0 1-1.2 1.5H5.7a1.2 1.2 0 0 1-1.2-1.5ZM19 6h2V4h1.5v2h2v1.5h-2v2H21v-2h-2V6Z"/></svg>
+                    </span>
+                    <span>Manajemen User</span>
+                </a>
+            @endif
         </nav>
         <div class="profile"><div class="avatar">{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}</div><div><strong>{{ auth()->user()->name }}</strong><small>{{ auth()->user()->email }}</small></div></div>
         <form action="{{ route('logout') }}" method="post">@csrf<button class="logout">Keluar</button></form>
@@ -80,7 +88,17 @@
         <header><button class="menu" onclick="document.querySelector('.sidebar')?.classList.toggle('open')">&#9776;</button><div><small>Sistem Manajemen Arsip</small><strong>ATV Diskominfo Kota Batu</strong></div></header>
         <div class="content">
             @if(session('success'))<div class="alert success"><strong>Berhasil</strong><span>{{ session('success') }}</span></div>@endif
-            @if($errors->any())<div class="alert danger"><strong>Periksa kembali</strong><span>Ada data yang belum sesuai. Koreksi bagian yang ditandai merah.</span></div>@endif
+            @if(session('warning'))<div class="alert warning"><strong>Perhatian</strong><span>{{ session('warning') }}</span></div>@endif
+            @if($errors->any())
+                <div class="alert danger">
+                    <strong>Periksa kembali</strong>
+                    <span>
+                        @foreach($errors->all() as $message)
+                            {{ $message }}{{ ! $loop->last ? ' ' : '' }}
+                        @endforeach
+                    </span>
+                </div>
+            @endif
             @yield('content')
         </div>
     </main>
@@ -102,7 +120,7 @@
     document.addEventListener('submit', (event) => {
         const form = event.target;
 
-        if (!(form instanceof HTMLFormElement) || form.dataset.loadingHandled === 'true') return;
+        if (!(form instanceof HTMLFormElement) || form.dataset.loadingHandled === 'true' || form.dataset.skipGlobalLoading === 'true') return;
 
         const submitter = event.submitter || form.querySelector('button[type="submit"], button:not([type]), input[type="submit"]');
         if (!submitter || submitter.dataset.noLoading === 'true') return;

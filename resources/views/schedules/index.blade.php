@@ -78,6 +78,25 @@
         <a class="btn reset-filter" href="{{ route('schedules.index') }}">Reset</a>
     </form>
 
+    @if($scheduleConflicts->isNotEmpty())
+        <section class="card schedule-conflict-panel">
+            <div class="card-head">
+                <div>
+                    <h2>Peringatan Jadwal Bentrok</h2>
+                    <small>Beberapa arsip punya tanggal dan jam tayang yang sama</small>
+                </div>
+            </div>
+            <div class="schedule-conflict-list">
+                @foreach($scheduleConflicts as $conflict)
+                    <div>
+                        <strong>{{ \Illuminate\Support\Carbon::parse($conflict->air_date)->format('d M Y') }}, {{ substr((string) $conflict->air_time, 0, 5) }}</strong>
+                        <span>{{ $conflict->total }} arsip terjadwal di waktu ini</span>
+                    </div>
+                @endforeach
+            </div>
+        </section>
+    @endif
+
     <div class="schedule-layout">
         <section class="schedule-calendar card">
             <div class="schedule-calendar-head">

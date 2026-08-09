@@ -102,4 +102,25 @@ class VideoArchive extends Model
 
         return $schedule;
     }
+
+    public function getEmbeddableVideoUrlAttribute(): ?string
+    {
+        if (! $this->video_url) {
+            return null;
+        }
+
+        $host = parse_url($this->video_url, PHP_URL_HOST);
+        $path = trim((string) parse_url($this->video_url, PHP_URL_PATH), '/');
+        parse_str((string) parse_url($this->video_url, PHP_URL_QUERY), $query);
+
+        if (str_contains((string) $host, 'youtube.com') && filled($query['v'] ?? null)) {
+            return 'https://www.youtube.com/embed/'.$query['v'];
+        }
+
+        if (str_contains((string) $host, 'youtu.be') && filled($path)) {
+            return 'https://www.youtube.com/embed/'.$path;
+        }
+
+        return null;
+    }
 }

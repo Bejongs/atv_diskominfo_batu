@@ -11,6 +11,7 @@ use App\Support\SimpleXlsxExporter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -85,7 +86,13 @@ class VideoArchiveController extends Controller
             }
         });
 
-        return redirect()->route('archives.index')->with('success', $createdCount > 1 ? $createdCount.' video berhasil ditambahkan ke arsip.' : 'Video berhasil ditambahkan ke arsip.');
+        $redirect = redirect()->route('archives.index')->with('success', $createdCount > 1 ? $createdCount.' video berhasil ditambahkan ke arsip.' : 'Video berhasil ditambahkan ke arsip.');
+
+        if ($warning = $this->scheduleConflictWarning($data)) {
+            $redirect->with('warning', $warning);
+        }
+
+        return $redirect;
     }
 
     public function show(VideoArchive $archive) { return view('archives.show', compact('archive')); }
@@ -93,14 +100,45 @@ class VideoArchiveController extends Controller
 
     public function bulkAction(Request $request)
     {
+        if (! $request->filled('action') && $request->filled('bulk_action')) {
+            $request->merge(['action' => $request->input('bulk_action')]);
+        }
+
+        if (! $request->filled('action') && $request->filled('status')) {
+            $request->merge(['action' => 'change_status']);
+        }
+
+        if (! $request->filled('action')) {
+            return redirect()->route('archives.index');
+        }
+
         $data = $request->validate([
             'selected' => ['required', 'array', 'min:1'],
-            'selected.*' => ['integer', 'distinct', 'exists:video_archives,id'],
+            'selected.*' => ['integer', 'distinct'],
             'action' => ['required', Rule::in(['change_status', 'delete'])],
-            'status' => ['required_if:action,change_status', Rule::in(VideoArchive::STATUSES)],
+            'status' => ['nullable', 'required_if:action,change_status', Rule::in(VideoArchive::STATUSES)],
+        ], [
+            'selected.required' => 'Pilih minimal satu arsip terlebih dahulu.',
+            'selected.min' => 'Pilih minimal satu arsip terlebih dahulu.',
+            'selected.*.integer' => 'Pilihan arsip tidak valid. Muat ulang halaman lalu pilih ulang.',
+            'selected.*.distinct' => 'Ada pilihan arsip yang terduplikasi. Muat ulang halaman lalu pilih ulang.',
+            'action.required' => 'Pilih aksi yang ingin dijalankan.',
+            'action.in' => 'Aksi yang dipilih tidak valid.',
+            'status.required_if' => 'Pilih status tujuan terlebih dahulu.',
+            'status.in' => 'Status tujuan tidak valid.',
         ]);
 
+        if ($data['action'] === 'delete') {
+            Gate::authorize('deleteAny', VideoArchive::class);
+        }
+
         $archives = VideoArchive::whereIn('id', $data['selected'])->get();
+
+        if ($archives->isEmpty()) {
+            return back()->withErrors([
+                'selected' => 'Arsip yang dipilih sudah tidak tersedia. Muat ulang halaman lalu pilih ulang.',
+            ])->withInput();
+        }
 
         DB::transaction(function () use ($archives, $data, $request): void {
             foreach ($archives as $archive) {
@@ -159,11 +197,19 @@ class VideoArchiveController extends Controller
         $this->logActivity($archive, $request->user()->id, 'updated', [
             'changes' => $this->buildChangeSet($before, $this->snapshotArchive($archive)),
         ]);
-        return redirect()->route('archives.show', $archive)->with('success', 'Data arsip berhasil diperbarui.');
+        $redirect = redirect()->route('archives.show', $archive)->with('success', 'Data arsip berhasil diperbarui.');
+
+        if ($warning = $this->scheduleConflictWarning($data, $archive)) {
+            $redirect->with('warning', $warning);
+        }
+
+        return $redirect;
     }
 
     public function destroy(VideoArchive $archive)
     {
+        Gate::authorize('delete', $archive);
+
         if ($archive->file_path) {
             Storage::disk('public')->delete($archive->file_path);
         }
@@ -540,6 +586,25 @@ SVG;
             'meta' => $meta,
         ]);
     }
+
+    private function scheduleConflictWarning(array $data, ?VideoArchive $currentArchive = null): ?string
+    {
+        if (blank($data['air_date'] ?? null) || blank($data['air_time'] ?? null)) {
+            return null;
+        }
+
+        $conflictCount = VideoArchive::whereDate('air_date', $data['air_date'])
+            ->where('air_time', $data['air_time'])
+            ->when($currentArchive, fn ($query) => $query->whereKeyNot($currentArchive->id))
+            ->count();
+
+        if ($conflictCount < 1) {
+            return null;
+        }
+
+        return 'Ada '.$conflictCount.' arsip lain dengan jadwal tayang yang sama. Periksa kembali agar tidak bentrok.';
+    }
+
 }
 
 

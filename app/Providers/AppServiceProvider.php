@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Models\VideoArchive;
+use App\Policies\VideoArchivePolicy;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -22,6 +24,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::policy(VideoArchive::class, VideoArchivePolicy::class);
+
         if (request()->headers->get('x-forwarded-proto') === 'https') {
             URL::forceScheme('https');
         }

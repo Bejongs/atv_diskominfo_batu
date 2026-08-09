@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\BackupController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
@@ -27,6 +29,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/jadwal-tayang', ScheduleController::class)->name('schedules.index');
     Route::get('/laporan', [ReportController::class, 'index'])->name('reports.index');
     Route::post('/laporan/export', [ReportController::class, 'export'])->name('reports.export');
+    Route::get('/backup/data', BackupController::class)->name('backup.data');
+    Route::resource('admin/users', UserController::class)->except(['show', 'destroy'])->names('admin.users');
     Route::post('/arsip/bulk-action', [VideoArchiveController::class, 'bulkAction'])->name('archives.bulk-action');
     Route::get('/arsip/{archive}/thumbnail', [VideoArchiveController::class, 'thumbnail'])->name('archives.thumbnail');
     Route::get('/arsip/{archive}/preview', [VideoArchiveController::class, 'preview'])->name('archives.preview');

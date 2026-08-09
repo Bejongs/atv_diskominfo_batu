@@ -68,6 +68,16 @@ class ScheduleController extends Controller
             ->latest()
             ->get();
 
+        $scheduleConflicts = (clone $scheduledQuery)
+            ->selectRaw('air_date, air_time, COUNT(*) as total')
+            ->whereNotNull('air_time')
+            ->whereBetween('air_date', $monthRange)
+            ->groupBy('air_date', 'air_time')
+            ->having('total', '>', 1)
+            ->orderBy('air_date')
+            ->orderBy('air_time')
+            ->get();
+
         $stats = [
             'scheduled_this_month' => (clone $scheduledQuery)->whereBetween('air_date', $monthRange)->count(),
             'ready_this_month' => (clone $scheduledQuery)->where('status', 'Siap Tayang')->whereBetween('air_date', $monthRange)->count(),
@@ -86,6 +96,7 @@ class ScheduleController extends Controller
             'todayArchives' => $todayArchives,
             'upcomingArchives' => $upcomingArchives,
             'unscheduledArchives' => $unscheduledArchives,
+            'scheduleConflicts' => $scheduleConflicts,
         ]);
     }
 

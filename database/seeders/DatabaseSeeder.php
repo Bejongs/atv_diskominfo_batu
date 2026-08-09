@@ -15,10 +15,22 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        User::factory()->create([
-            'name' => 'Administrator ATV',
+        User::updateOrCreate([
             'email' => 'admin@atv.kominfo',
+        ], [
+            'name' => 'Administrator ATV',
             'password' => 'atv12345',
+            'role' => User::ROLE_SUPER_ADMIN,
+            'is_active' => true,
+        ]);
+
+        User::updateOrCreate([
+            'email' => 'staff@atv.kominfo',
+        ], [
+            'name' => 'Staff ATV',
+            'password' => 'staff12345',
+            'role' => User::ROLE_ADMIN,
+            'is_active' => true,
         ]);
     }
 }

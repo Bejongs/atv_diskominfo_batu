@@ -118,10 +118,65 @@ class ArchiveManagementTest extends TestCase
         $this->assertDatabaseHas('video_archives', ['id' => $second->id, 'status' => 'Review']);
     }
 
+    public function test_bulk_action_ignores_stale_selected_archive_ids(): void
+    {
+        $user = User::factory()->create();
+        $archive = $this->createArchiveForBulkAction($user, ['title' => 'Arsip Masih Ada']);
+
+        $response = $this->actingAs($user)->post(route('archives.bulk-action'), [
+            'selected' => [$archive->id, 999999],
+            'action' => 'change_status',
+            'status' => 'Review',
+        ]);
+
+        $response->assertRedirect(route('archives.index'));
+        $this->assertDatabaseHas('video_archives', ['id' => $archive->id, 'status' => 'Review']);
+    }
+
+    public function test_bulk_action_can_infer_change_status_when_submitter_action_is_missing(): void
+    {
+        $user = User::factory()->create();
+        $archive = $this->createArchiveForBulkAction($user, ['title' => 'Arsip Enter Submit']);
+
+        $response = $this->actingAs($user)->post(route('archives.bulk-action'), [
+            'selected' => [$archive->id],
+            'status' => 'Review',
+        ]);
+
+        $response->assertRedirect(route('archives.index'));
+        $this->assertDatabaseHas('video_archives', ['id' => $archive->id, 'status' => 'Review']);
+    }
+
+    public function test_bulk_action_without_action_redirects_without_validation_error(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->from(route('archives.index'))->post(route('archives.bulk-action'), [
+            'selected' => [999999],
+        ]);
+
+        $response->assertRedirect(route('archives.index'));
+        $response->assertSessionDoesntHaveErrors();
+    }
+
+    public function test_bulk_action_shows_clear_error_when_no_selected_archive_exists(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->from(route('archives.index'))->post(route('archives.bulk-action'), [
+            'selected' => [999999],
+            'action' => 'change_status',
+            'status' => 'Review',
+        ]);
+
+        $response->assertRedirect(route('archives.index'));
+        $response->assertSessionHasErrors(['selected']);
+    }
+
     public function test_user_can_delete_selected_archives(): void
     {
         Storage::fake('public');
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $first = $this->createArchiveForBulkAction($user, ['title' => 'Arsip Hapus 1']);
         $second = $this->createArchiveForBulkAction($user, ['title' => 'Arsip Hapus 2']);
 
@@ -133,6 +188,48 @@ class ArchiveManagementTest extends TestCase
         $response->assertRedirect(route('archives.index'));
         $this->assertDatabaseMissing('video_archives', ['id' => $first->id]);
         $this->assertDatabaseMissing('video_archives', ['id' => $second->id]);
+    }
+
+    public function test_user_can_delete_selected_archives_with_hidden_bulk_action(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $archive = $this->createArchiveForBulkAction($user, ['title' => 'Arsip Hapus Modal']);
+
+        $response = $this->actingAs($user)->post(route('archives.bulk-action'), [
+            'selected' => [$archive->id],
+            'bulk_action' => 'delete',
+            'confirmed_delete' => '1',
+            'status' => '',
+        ]);
+
+        $response->assertRedirect(route('archives.index'));
+        $this->assertDatabaseMissing('video_archives', ['id' => $archive->id]);
+    }
+
+    public function test_regular_admin_cannot_delete_selected_archives(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $archive = $this->createArchiveForBulkAction($user, ['title' => 'Arsip Tidak Boleh Hapus']);
+
+        $this->actingAs($user)->post(route('archives.bulk-action'), [
+            'selected' => [$archive->id],
+            'action' => 'delete',
+        ])->assertForbidden();
+
+        $this->assertDatabaseHas('video_archives', ['id' => $archive->id]);
+    }
+
+    public function test_regular_admin_cannot_delete_archive_directly(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $archive = $this->createArchiveForBulkAction($user, ['title' => 'Arsip Direct Delete']);
+
+        $this->actingAs($user)->delete(route('archives.destroy', $archive))->assertForbidden();
+
+        $this->assertDatabaseHas('video_archives', ['id' => $archive->id]);
     }
 
     public function test_user_can_export_filtered_video_archives_to_xlsx_and_pdf(): void

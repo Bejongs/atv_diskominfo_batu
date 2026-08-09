@@ -4,9 +4,10 @@
 @php
     $trendMax = max(collect($uploadTrend)->max('total') ?: 0, 1);
     $trendPlotWidth = 620;
-    $trendPlotHeight = 180;
+    $trendPlotHeight = 210;
     $trendLeft = 40;
-    $trendTop = 26;
+    $trendTop = 22;
+    $trendBottom = $trendTop + $trendPlotHeight;
     $trendStep = count($uploadTrend) > 1 ? $trendPlotWidth / (count($uploadTrend) - 1) : 0;
     $trendPoints = collect($uploadTrend)->values()->map(function ($day, $index) use ($trendLeft, $trendTop, $trendPlotHeight, $trendStep, $trendMax) {
         $x = $trendLeft + ($trendStep * $index);
@@ -17,9 +18,24 @@
             'y' => $y,
             'label' => $day['label'],
             'total' => $day['total'],
+            'period' => $day['period'] ?? $day['label'],
         ];
     });
-    $trendPolyline = $trendPoints->map(fn ($point) => $point['x'].','.$point['y'])->implode(' ');
+    $trendPath = '';
+    $trendPoints->each(function ($point, $index) use ($trendPoints, &$trendPath) {
+        if ($index === 0) {
+            $trendPath = 'M '.$point['x'].' '.$point['y'];
+
+            return;
+        }
+
+        $previous = $trendPoints[$index - 1];
+        $controlOffset = ($point['x'] - $previous['x']) / 2;
+        $trendPath .= ' C '.($previous['x'] + $controlOffset).' '.$previous['y'].' '.($point['x'] - $controlOffset).' '.$point['y'].' '.$point['x'].' '.$point['y'];
+    });
+    $trendAreaPath = $trendPoints->isNotEmpty()
+        ? $trendPath.' L '.$trendPoints->last()['x'].' '.$trendBottom.' L '.$trendPoints->first()['x'].' '.$trendBottom.' Z'
+        : '';
 @endphp
 
 <div class="dashboard-page">
@@ -29,7 +45,12 @@
             <h1>Dashboard</h1>
             <p>Ringkasan arsip tayangan ATV hari ini.</p>
         </div>
-        <a class="btn primary" href="{{ route('archives.upload') }}">&#43; Upload Video</a>
+        <div class="dashboard-head-actions">
+            @if(auth()->user()?->isSuperAdmin())
+                <a class="btn" href="{{ route('backup.data') }}">Backup Data</a>
+            @endif
+            <a class="btn primary" href="{{ route('archives.upload') }}">&#43; Upload Video</a>
+        </div>
     </div>
 
     <div class="stats">
@@ -140,28 +161,45 @@
             <div class="card-head">
                 <div>
                     <h2>Trend Statistik Upload</h2>
-                    <small>Jumlah arsip masuk dalam 7 hari terakhir</small>
+                    <small>Jumlah arsip masuk harian dalam 7 hari terakhir</small>
                 </div>
             </div>
-            <div class="line-chart-shell">
-                <svg class="line-chart-svg" viewBox="0 0 700 300" preserveAspectRatio="none" role="img" aria-label="Trend statistik upload">
-                    @for($i = 0; $i <= 4; $i++)
+            <div class="line-chart-shell interactive-line-chart" data-upload-trend>
+                <div class="line-chart-tooltip" data-chart-tooltip hidden>
+                    <strong data-chart-tooltip-total>0 upload</strong>
+                    <span data-chart-tooltip-label>Jan</span>
+                </div>
+                <svg class="line-chart-svg" viewBox="0 0 700 300" preserveAspectRatio="none" role="img" aria-label="Trend statistik upload harian tujuh hari terakhir">
+                    <defs>
+                        <linearGradient id="uploadTrendArea" x1="0" x2="0" y1="0" y2="1">
+                            <stop offset="0%" stop-color="#3b82f6" stop-opacity=".28"/>
+                            <stop offset="100%" stop-color="#3b82f6" stop-opacity=".04"/>
+                        </linearGradient>
+                    </defs>
+                    @for($i = 0; $i <= 8; $i++)
                         @php
-                            $gridValue = round($trendMax - (($trendMax / 4) * $i));
-                            $gridY = 26 + (180 / 4) * $i;
+                            $gridY = $trendTop + ($trendPlotHeight / 8) * $i;
                         @endphp
                         <line x1="40" y1="{{ $gridY }}" x2="660" y2="{{ $gridY }}" class="chart-grid"></line>
-                        <text x="8" y="{{ $gridY + 4 }}" class="chart-axis-label">{{ $gridValue }}</text>
                     @endfor
 
                     @if($trendPoints->count() > 1)
-                        <polyline points="{{ $trendPolyline }}" class="chart-line"></polyline>
+                        <path d="{{ $trendAreaPath }}" class="chart-area"></path>
+                        <path d="{{ $trendPath }}" class="chart-line"></path>
                     @endif
 
                     @foreach($trendPoints as $point)
-                        <circle cx="{{ $point['x'] }}" cy="{{ $point['y'] }}" r="5.5" class="chart-point"></circle>
-                        <text x="{{ $point['x'] }}" y="272" class="chart-x-label" text-anchor="middle">{{ $point['label'] }}</text>
-                        <text x="{{ $point['x'] }}" y="{{ $point['y'] - 14 }}" class="chart-value" text-anchor="middle">{{ $point['total'] }}</text>
+                        <g class="chart-hit"
+                           tabindex="0"
+                           data-label="{{ $point['label'] }}: {{ $point['period'] }}"
+                           data-total="{{ $point['total'] }}"
+                           data-x="{{ $point['x'] }}"
+                           data-y="{{ $point['y'] }}">
+                            <line x1="{{ $point['x'] }}" y1="{{ $trendTop }}" x2="{{ $point['x'] }}" y2="{{ $trendBottom }}" class="chart-hover-line"></line>
+                            <circle cx="{{ $point['x'] }}" cy="{{ $point['y'] }}" r="5.8" class="chart-point"></circle>
+                            <circle cx="{{ $point['x'] }}" cy="{{ $point['y'] }}" r="18" class="chart-point-target"></circle>
+                        </g>
+                        <text x="{{ $point['x'] }}" y="274" class="chart-x-label" text-anchor="middle">{{ $point['label'] }}</text>
                     @endforeach
                 </svg>
             </div>
@@ -239,4 +277,43 @@
         </div>
     </section>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const chart = document.querySelector('[data-upload-trend]');
+    const tooltip = chart?.querySelector('[data-chart-tooltip]');
+    const tooltipTotal = chart?.querySelector('[data-chart-tooltip-total]');
+    const tooltipLabel = chart?.querySelector('[data-chart-tooltip-label]');
+    const points = chart?.querySelectorAll('.chart-hit') || [];
+
+    if (!chart || !tooltip || !tooltipTotal || !tooltipLabel || !points.length) return;
+
+    const showPoint = (point) => {
+        const total = Number(point.dataset.total || 0);
+        const label = point.dataset.label || '';
+        const x = Number(point.dataset.x || 0);
+        const y = Number(point.dataset.y || 0);
+        const xPercent = (x / 700) * 100;
+        const yPercent = (y / 300) * 100;
+
+        points.forEach((item) => item.classList.toggle('is-active', item === point));
+        tooltipTotal.textContent = `${total} upload`;
+        tooltipLabel.textContent = label;
+        tooltip.style.left = `${xPercent}%`;
+        tooltip.style.top = `${yPercent}%`;
+        tooltip.hidden = false;
+    };
+
+    const hidePoint = () => {
+        points.forEach((point) => point.classList.remove('is-active'));
+        tooltip.hidden = true;
+    };
+
+    points.forEach((point) => {
+        point.addEventListener('mouseenter', () => showPoint(point));
+        point.addEventListener('focus', () => showPoint(point));
+        point.addEventListener('mouseleave', hidePoint);
+        point.addEventListener('blur', hidePoint);
+    });
+});
+</script>
 @endsection

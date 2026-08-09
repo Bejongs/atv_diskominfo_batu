@@ -14,17 +14,19 @@ class DashboardController extends Controller
         $syncer->syncDueToAired();
 
         $trendStartDate = now()->subDays(6)->startOfDay();
-        $dailyUploads = VideoArchive::where('created_at', '>=', $trendStartDate)
+        $trendEndDate = now()->endOfDay();
+        $dailyUploads = VideoArchive::whereBetween('created_at', [$trendStartDate, $trendEndDate])
             ->get(['created_at'])
             ->groupBy(fn (VideoArchive $archive) => $archive->created_at->format('Y-m-d'))
             ->map->count();
         $trendMax = max($dailyUploads->max() ?: 0, 1);
-        $uploadTrend = collect(CarbonPeriod::create($trendStartDate, now()->startOfDay()))
+        $uploadTrend = collect(CarbonPeriod::create($trendStartDate, $trendEndDate))
             ->map(function ($date) use ($dailyUploads, $trendMax) {
                 $total = $dailyUploads[$date->format('Y-m-d')] ?? 0;
 
                 return [
                     'label' => $date->translatedFormat('d M'),
+                    'period' => $date->translatedFormat('l, d M Y'),
                     'total' => $total,
                     'percent' => max(6, round(($total / $trendMax) * 100)),
                 ];

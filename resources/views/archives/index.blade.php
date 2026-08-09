@@ -9,6 +9,7 @@
     $activeSort = request('sort') ?: 'latest';
     $dateFrom = request('date_from');
     $dateTo = request('date_to');
+    $canDeleteArchives = auth()->user()?->canDeleteArchives();
     $activeFilterCount = $activeIssues->count()
         + $activeStatuses->count()
         + $activeRatings->count()
@@ -144,8 +145,10 @@
         </div>
     </form>
 
-    <form id="archive-bulk-form" method="post" action="{{ route('archives.bulk-action') }}">
+    <form id="archive-bulk-form" method="post" action="{{ route('archives.bulk-action') }}" data-skip-global-loading="true">
         @csrf
+        <input type="hidden" name="bulk_action" value="" data-bulk-action>
+        <input type="hidden" name="confirmed_delete" value="0" data-confirmed-delete>
         <div class="archive-selection-bar" data-selection-bar hidden>
             <label class="archive-select-all">
                 <input type="checkbox" aria-label="Pilih semua arsip" data-selection-select-all>
@@ -159,7 +162,9 @@
                 @endforeach
             </select>
             <button class="btn primary" type="submit" name="action" value="change_status" data-status-action>Ubah Status</button>
-            <button class="btn danger compact-danger" type="submit" name="action" value="delete" data-delete-selected>Hapus</button>
+            @if($canDeleteArchives)
+                <button class="btn danger compact-danger" type="button" data-delete-selected>Hapus</button>
+            @endif
         </div>
         <div data-selection-hidden></div>
 
@@ -282,6 +287,22 @@
     {{ $archives->links('pagination.simple-atv') }}
 </section>
 
+@if($canDeleteArchives)
+    <div id="bulk-delete-modal" class="delete-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="bulk-delete-title" hidden>
+        <div class="delete-confirm-dialog">
+            <div class="delete-confirm-icon" aria-hidden="true">!</div>
+            <div>
+                <h2 id="bulk-delete-title">Hapus arsip terpilih?</h2>
+                <p><strong><span data-bulk-delete-count>0</span> arsip</strong> akan dihapus bersama file video yang tersimpan. Tindakan ini tidak bisa dibatalkan.</p>
+            </div>
+            <div class="delete-confirm-actions">
+                <button type="button" class="btn" data-bulk-delete-close>Batal</button>
+                <button type="submit" class="btn danger" form="archive-bulk-form" name="bulk_action" value="delete" data-bulk-delete-confirm>Hapus Arsip</button>
+            </div>
+        </div>
+    </div>
+@endif
+
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const sheet = document.querySelector('[data-filter-sheet]');
@@ -294,8 +315,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const selectionSelectAll = document.querySelector('[data-selection-select-all]');
     const bulkItems = document.querySelectorAll('[data-bulk-item]');
     const bulkStatus = document.querySelector('[data-bulk-status]');
+    const bulkActionInput = document.querySelector('[data-bulk-action]');
+    const confirmedDeleteInput = document.querySelector('[data-confirmed-delete]');
     const hiddenSelection = document.querySelector('[data-selection-hidden]');
+    const bulkDeleteModal = document.getElementById('bulk-delete-modal');
+    const bulkDeleteCount = document.querySelector('[data-bulk-delete-count]');
+    const bulkDeleteConfirm = document.querySelector('[data-bulk-delete-confirm]');
+    const bulkDeleteCloseButtons = document.querySelectorAll('[data-bulk-delete-close]');
     const selectionKey = 'atv.archive.selected';
+    const shouldClearStoredSelection = @json($errors->has('selected'));
+
+    if (shouldClearStoredSelection) {
+        localStorage.removeItem(selectionKey);
+    }
 
     const getStoredSelection = () => {
         try {
@@ -354,6 +386,20 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.classList.remove('filter-sheet-open');
     };
 
+    const openBulkDeleteModal = (count) => {
+        if (!bulkDeleteModal) return;
+        if (bulkDeleteCount) bulkDeleteCount.textContent = count;
+        bulkDeleteModal.hidden = false;
+        document.body.classList.add('delete-confirm-open');
+    };
+
+    const closeBulkDeleteModal = () => {
+        if (!bulkDeleteModal) return;
+        bulkDeleteModal.hidden = true;
+        document.body.classList.remove('delete-confirm-open');
+        if (confirmedDeleteInput) confirmedDeleteInput.value = '0';
+    };
+
     openButton?.addEventListener('click', openSheet);
     closeButtons.forEach((button) => button.addEventListener('click', closeSheet));
     tableSelectAll?.addEventListener('change', () => {
@@ -392,11 +438,54 @@ document.addEventListener('DOMContentLoaded', () => {
         storeSelection(selected);
         syncTableSelectAll();
     }));
+
+    document.querySelector('[data-status-action]')?.addEventListener('click', () => {
+        if (bulkActionInput) bulkActionInput.value = 'change_status';
+    });
+
+    document.querySelector('[data-delete-selected]')?.addEventListener('click', () => {
+        const selected = getStoredSelection();
+
+        if (!selected.size) {
+            syncTableSelectAll();
+
+            return;
+        }
+
+        if (bulkActionInput) bulkActionInput.value = 'delete';
+        if (confirmedDeleteInput) confirmedDeleteInput.value = '0';
+        renderHiddenSelection(selected);
+        openBulkDeleteModal(selected.size);
+    });
+
+    bulkDeleteCloseButtons.forEach((button) => button.addEventListener('click', closeBulkDeleteModal));
+    bulkDeleteModal?.addEventListener('click', (event) => {
+        if (event.target === bulkDeleteModal) closeBulkDeleteModal();
+    });
+    bulkDeleteConfirm?.addEventListener('click', (event) => {
+        const selected = getStoredSelection();
+        if (!selected.size) {
+            event.preventDefault();
+            closeBulkDeleteModal();
+            syncTableSelectAll();
+
+            return;
+        }
+
+        if (bulkActionInput) bulkActionInput.value = 'delete';
+        if (confirmedDeleteInput) confirmedDeleteInput.value = '1';
+        renderHiddenSelection(selected);
+    });
+
     bulkForm?.addEventListener('submit', (event) => {
         const submitter = event.submitter;
-        const action = submitter?.value;
+        const action = submitter?.value || bulkActionInput?.value || (bulkStatus?.value ? 'change_status' : '');
         const selected = getStoredSelection();
         const checked = selected.size;
+
+        if (bulkActionInput) {
+            bulkActionInput.value = action;
+        }
 
         if (!checked) {
             event.preventDefault();
@@ -409,8 +498,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        if (action === 'delete' && !confirm(`Hapus ${checked} arsip yang dipilih?`)) {
+        if (action === 'delete' && confirmedDeleteInput?.value !== '1') {
             event.preventDefault();
+            openBulkDeleteModal(checked);
+
             return;
         }
 
@@ -421,6 +512,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && sheet && !sheet.hidden) {
             closeSheet();
+        }
+
+        if (event.key === 'Escape' && bulkDeleteModal && !bulkDeleteModal.hidden) {
+            closeBulkDeleteModal();
         }
     });
 });

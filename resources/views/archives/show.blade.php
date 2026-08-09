@@ -35,6 +35,8 @@
                 <source src="{{ route('archives.preview', $archive) }}" type="{{ $archive->mime_type }}">
                 Browser tidak mendukung video.
             </video>
+        @elseif($archive->embeddable_video_url)
+            <iframe class="video-embed-preview" src="{{ $archive->embeddable_video_url }}" title="Preview {{ $archive->title }}" allowfullscreen></iframe>
         @else
             <div class="empty">Belum ada file video.</div>
         @endif
@@ -104,25 +106,27 @@
     @endforelse
 </section>
 
-<form id="delete-archive-form" method="post" action="{{ route('archives.destroy',$archive) }}">
-    @csrf
-    @method('delete')
-    <button class="btn danger" type="button" data-delete-open>Hapus Arsip</button>
-</form>
+@if(auth()->user()?->canDeleteArchives())
+    <form id="delete-archive-form" method="post" action="{{ route('archives.destroy',$archive) }}">
+        @csrf
+        @method('delete')
+        <button class="btn danger" type="button" data-delete-open>Hapus Arsip</button>
+    </form>
 
-<div id="delete-archive-modal" class="delete-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-archive-title" hidden>
-    <div class="delete-confirm-dialog">
-        <div class="delete-confirm-icon" aria-hidden="true">!</div>
-        <div>
-            <h2 id="delete-archive-title">Hapus Arsip?</h2>
-            <p>Arsip <strong>{{ $archive->title }}</strong> akan dihapus bersama file video yang tersimpan. Tindakan ini tidak bisa dibatalkan.</p>
-        </div>
-        <div class="delete-confirm-actions">
-            <button type="button" class="btn" data-delete-close>Batal</button>
-            <button type="submit" class="btn danger" form="delete-archive-form">Hapus Arsip</button>
+    <div id="delete-archive-modal" class="delete-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-archive-title" hidden>
+        <div class="delete-confirm-dialog">
+            <div class="delete-confirm-icon" aria-hidden="true">!</div>
+            <div>
+                <h2 id="delete-archive-title">Hapus Arsip?</h2>
+                <p>Arsip <strong>{{ $archive->title }}</strong> akan dihapus bersama file video yang tersimpan. Tindakan ini tidak bisa dibatalkan.</p>
+            </div>
+            <div class="delete-confirm-actions">
+                <button type="button" class="btn" data-delete-close>Batal</button>
+                <button type="submit" class="btn danger" form="delete-archive-form">Hapus Arsip</button>
+            </div>
         </div>
     </div>
-</div>
+@endif
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {

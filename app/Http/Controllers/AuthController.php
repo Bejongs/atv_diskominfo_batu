@@ -47,6 +47,12 @@ class AuthController extends Controller
             return back()->withErrors(['email' => 'Email atau kata sandi tidak sesuai.'])->onlyInput('email');
         }
 
+        if (! $request->user()->is_active) {
+            Auth::logout();
+
+            return back()->withErrors(['email' => 'Akun ini sedang dinonaktifkan. Hubungi super admin.'])->onlyInput('email');
+        }
+
         $request->session()->regenerate();
         return redirect()->intended(route('dashboard'));
     }
