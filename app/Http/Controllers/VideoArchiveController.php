@@ -6,6 +6,7 @@ use App\Models\VideoArchiveActivity;
 use App\Models\VideoArchive;
 use App\Services\CategoryDetector;
 use App\Services\VideoArchiveStatusSyncer;
+use App\Services\YouTubeFeedImporter;
 use App\Support\SimplePdfExporter;
 use App\Support\SimpleXlsxExporter;
 use Illuminate\Http\JsonResponse;
@@ -26,6 +27,21 @@ class VideoArchiveController extends Controller
         ]);
 
         return response()->json($detector->detect($data['title'], $data['description'] ?? null));
+    }
+
+    public function syncYouTube(Request $request, YouTubeFeedImporter $importer)
+    {
+        if (! $importer->isConfigured()) {
+            return redirect()
+                ->route('archives.index')
+                ->with('warning', 'Isi YOUTUBE_CHANNEL_ID atau YOUTUBE_FEED_URL terlebih dahulu sebelum sinkron YouTube.');
+        }
+
+        $result = $importer->import($request->user()->id);
+
+        return redirect()
+            ->route('archives.index')
+            ->with('success', 'Sinkron YouTube selesai. '.$result['created'].' video baru ditambahkan, '.$result['updated'].' durasi diperbarui, '.$result['skipped'].' video sudah ada.');
     }
 
     public function index(Request $request, VideoArchiveStatusSyncer $syncer)
@@ -475,6 +491,10 @@ SVG;
             'air_date' => $archive->air_date?->format('Y-m-d'),
             'air_time' => $archive->air_time ? substr((string) $archive->air_time, 0, 5) : null,
             'video_url' => $archive->video_url,
+            'source' => $archive->source,
+            'external_id' => $archive->external_id,
+            'external_thumbnail_url' => $archive->external_thumbnail_url,
+            'external_published_at' => $archive->external_published_at?->format('Y-m-d H:i:s'),
             'duration_seconds' => $archive->duration_seconds,
             'file_path' => $archive->file_path,
             'thumbnail_path' => $archive->thumbnail_path,
@@ -496,6 +516,10 @@ SVG;
             'air_date' => 'Tanggal tayang',
             'air_time' => 'Jam tayang',
             'video_url' => 'Link video',
+            'source' => 'Sumber',
+            'external_id' => 'ID eksternal',
+            'external_thumbnail_url' => 'Thumbnail eksternal',
+            'external_published_at' => 'Tanggal publish eksternal',
             'duration_seconds' => 'Durasi',
             'file_path' => 'File video',
             'thumbnail_path' => 'Thumbnail',

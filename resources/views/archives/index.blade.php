@@ -25,6 +25,10 @@
         <p>Kelola, cari, dan kurasi seluruh materi tayangan ATV dalam satu ruang kerja.</p>
     </div>
     <div class="archive-hero-actions">
+        <form method="post" action="{{ route('archives.sync-youtube') }}">
+            @csrf
+            <button class="btn" type="submit">Sinkron YouTube</button>
+        </form>
         <a class="btn primary archive-upload" href="{{ route('archives.upload') }}">&#43; Upload Video</a>
     </div>
 </div>

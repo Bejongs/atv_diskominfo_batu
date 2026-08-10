@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('archives:sync-statuses')->everyMinute();
+Schedule::command('archives:sync-youtube')->everyTenMinutes()->withoutOverlapping();

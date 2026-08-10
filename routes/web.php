@@ -24,6 +24,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/profil/edit', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('/profil', [ProfileController::class, 'update'])->name('profile.update');
     Route::post('/arsip/deteksi-kategori', [VideoArchiveController::class, 'detectCategory'])->name('archives.detect-category');
+    Route::post('/arsip/sinkron-youtube', [VideoArchiveController::class, 'syncYouTube'])->name('archives.sync-youtube');
     Route::get('/arsip/export', [VideoArchiveController::class, 'export'])->name('archives.export');
     Route::get('/upload', [VideoArchiveController::class, 'create'])->name('archives.upload');
     Route::get('/jadwal-tayang', ScheduleController::class)->name('schedules.index');

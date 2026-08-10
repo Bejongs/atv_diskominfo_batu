@@ -22,13 +22,16 @@ class VideoArchive extends Model
     ];
 
     protected $fillable = [
-        'user_id', 'title', 'description', 'category', 'issue', 'age_rating', 'status',
-        'air_date', 'air_time', 'video_url', 'duration_minutes', 'duration_seconds', 'file_path', 'thumbnail_path', 'original_name', 'mime_type', 'file_size',
+        'user_id', 'source', 'external_id', 'title', 'description', 'category', 'issue', 'age_rating', 'status',
+        'air_date', 'air_time', 'video_url', 'duration_minutes', 'duration_seconds', 'file_path', 'thumbnail_path', 'external_thumbnail_url', 'external_published_at', 'original_name', 'mime_type', 'file_size',
     ];
 
     protected function casts(): array
     {
-        return ['air_date' => 'date'];
+        return [
+            'air_date' => 'date',
+            'external_published_at' => 'datetime',
+        ];
     }
 
     public function user(): BelongsTo

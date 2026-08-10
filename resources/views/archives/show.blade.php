@@ -54,6 +54,12 @@
         <dl>
             <dt>Status</dt>
             <dd><span class="badge status-{{ str($archive->status)->slug() }}">{{ $archive->status }}</span></dd>
+            <dt>Sumber</dt>
+            <dd>{{ $archive->source === 'youtube' ? 'YouTube' : 'Manual' }}</dd>
+            @if($archive->external_published_at)
+                <dt>Publish YouTube</dt>
+                <dd>{{ $archive->external_published_at->format('d M Y, H:i') }}</dd>
+            @endif
             <dt>Kategori</dt>
             <dd>{{ $archive->category }}</dd>
             <dt>Issue</dt>

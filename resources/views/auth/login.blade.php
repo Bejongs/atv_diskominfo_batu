@@ -114,7 +114,31 @@
                     </button>
                 </form>
 
-                <small class="hint">Email: admin@atv.kominfo | Kata sandi: atv12345</small>
+                <div class="login-credential-box" aria-label="Informasi akun masuk">
+                    <span>Akun tersedia</span>
+                    <div class="login-credential-row">
+                        <strong>Super Admin</strong>
+                        <div>
+                            <small>Email</small>
+                            <code>admin@atv.kominfo</code>
+                        </div>
+                        <div>
+                            <small>Kata sandi</small>
+                            <code>atv12345</code>
+                        </div>
+                    </div>
+                    <div class="login-credential-row">
+                        <strong>Admin</strong>
+                        <div>
+                            <small>Email</small>
+                            <code>staff@atv.kominfo</code>
+                        </div>
+                        <div>
+                            <small>Kata sandi</small>
+                            <code>staff12345</code>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
     </main>

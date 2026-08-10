@@ -261,14 +261,16 @@ http://127.0.0.1:8000
 
 ## Akun Awal
 
-Seeder membuat satu akun administrator:
+Seeder membuat dua akun awal:
 
-```text
-Email    : admin@atv.kominfo
-Password : atv12345
-```
+| Role | Email | Kata Sandi |
+| --- | --- | --- |
+| Super Admin | `admin@atv.kominfo` | `atv12345` |
+| Admin | `staff@atv.kominfo` | `staff12345` |
 
-Segera ubah password setelah login pertama melalui halaman profil.
+Super Admin dapat mengelola pengguna, menghapus arsip, dan mengunduh backup data. Admin dapat mengelola arsip, jadwal, laporan, dan profil sesuai akses aplikasi.
+
+Segera ubah kata sandi default setelah login pertama melalui halaman profil, terutama jika aplikasi dipakai di lingkungan produksi.
 
 ## Screenshot
 
@@ -379,34 +381,42 @@ Backup database wajib dilakukan sebelum menjalankan command yang berpotensi meng
 - import database baru
 - perubahan migration besar
 
+Super Admin juga dapat mengunduh backup JSON dari aplikasi melalui route:
+
+```text
+/backup/data
+```
+
+Backup JSON ini berguna untuk arsip data aplikasi dalam format yang mudah dibaca, tetapi file upload tetap harus dibackup terpisah dari folder `storage/app/public`.
+
 ### Backup MySQL
 
 ```bash
-mysqldump -u root atv_arsip > backup_atv_arsip.sql
+mysqldump -u root atv_diskominfo_batu > backup_atv_diskominfo_batu.sql
 ```
 
 Jika database memakai password:
 
 ```bash
-mysqldump -u root -p atv_arsip > backup_atv_arsip.sql
+mysqldump -u root -p atv_diskominfo_batu > backup_atv_diskominfo_batu.sql
 ```
 
 Contoh backup dengan timestamp di PowerShell:
 
 ```powershell
-mysqldump -u root atv_arsip > "backup_atv_arsip_$(Get-Date -Format yyyyMMdd_HHmmss).sql"
+mysqldump -u root atv_diskominfo_batu > "backup_atv_diskominfo_batu_$(Get-Date -Format yyyyMMdd_HHmmss).sql"
 ```
 
 ### Restore MySQL
 
 ```bash
-mysql -u root atv_arsip < backup_atv_arsip.sql
+mysql -u root atv_diskominfo_batu < backup_atv_diskominfo_batu.sql
 ```
 
 Jika memakai password:
 
 ```bash
-mysql -u root -p atv_arsip < backup_atv_arsip.sql
+mysql -u root -p atv_diskominfo_batu < backup_atv_diskominfo_batu.sql
 ```
 
 ### Backup File Upload
@@ -468,7 +478,7 @@ Setelah recovery, lengkapi kembali metadata yang hilang melalui halaman edit ars
 
 Command `archives:sync-statuses` dapat dijalankan manual, tetapi untuk produksi sebaiknya dipanggil otomatis oleh Laravel scheduler.
 
-Tambahkan scheduler di `routes/console.php`:
+Scheduler command sudah didaftarkan di `routes/console.php`:
 
 ```php
 use Illuminate\Support\Facades\Schedule;
@@ -490,6 +500,34 @@ php artisan schedule:run
 
 Pastikan task dijalankan dari folder project.
 
+Jika scheduler tidak berjalan, status arsip tetap bisa berubah ketika halaman dashboard atau daftar arsip dibuka, tetapi proses otomatis di server tidak akan konsisten.
+
+## Konfigurasi Produksi
+
+Contoh konfigurasi `.env` untuk server produksi:
+
+```env
+APP_NAME="ATV Arsip"
+APP_ENV=production
+APP_KEY=base64:...
+APP_DEBUG=false
+APP_URL=https://domain-aplikasi.example
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=atv_diskominfo_batu
+DB_USERNAME=nama_user_database
+DB_PASSWORD=password_database
+
+FILESYSTEM_DISK=public
+QUEUE_CONNECTION=database
+SESSION_DRIVER=database
+CACHE_STORE=database
+```
+
+Pastikan `APP_URL` sesuai domain produksi karena URL asset, storage, dan redirect bergantung pada konfigurasi ini.
+
 ## Keamanan
 
 - Ubah password default setelah instalasi pertama.
@@ -506,7 +544,12 @@ Pastikan task dijalankan dari folder project.
 Test feature yang tersedia:
 
 - `tests/Feature/ArchiveManagementTest.php`
+- `tests/Feature/AdminUserManagementTest.php`
+- `tests/Feature/DashboardAndBackupTest.php`
+- `tests/Feature/ErrorPageTest.php`
+- `tests/Feature/ProfileManagementTest.php`
 - `tests/Feature/ReportManagementTest.php`
+- `tests/Feature/ScheduleAndPreviewTest.php`
 
 Jalankan semua test:
 
@@ -517,8 +560,11 @@ php artisan test
 Jalankan test tertentu:
 
 ```bash
+php artisan test --filter=AdminUserManagementTest
 php artisan test --filter=ArchiveManagementTest
+php artisan test --filter=DashboardAndBackupTest
 php artisan test --filter=ReportManagementTest
+php artisan test --filter=ScheduleAndPreviewTest
 ```
 
 ## Troubleshooting
@@ -548,8 +594,8 @@ php artisan migrate:fresh --seed
 Gunakan akun:
 
 ```text
-admin@atv.kominfo
-atv12345
+Super Admin : admin@atv.kominfo / atv12345
+Admin       : staff@atv.kominfo / staff12345
 ```
 
 ### Asset CSS atau JS tidak berubah
@@ -578,13 +624,16 @@ Jika ingin otomatis periodik di server produksi, ikuti bagian **Scheduler**.
 
 ## Deployment Checklist
 
-- Set `.env` produksi dengan `APP_ENV=production` dan `APP_DEBUG=false`
+- Backup database dan folder `storage/app/public` sebelum update
+- Set `.env` produksi dengan `APP_ENV=production`, `APP_DEBUG=false`, dan `APP_URL` domain asli
 - Pastikan database produksi sudah dibuat
 - Jalankan `composer install --no-dev --optimize-autoloader`
 - Jalankan `php artisan key:generate` jika belum ada `APP_KEY`
 - Jalankan `php artisan migrate --force`
 - Jalankan `php artisan storage:link`
 - Jalankan `npm ci` dan `npm run build`
+- Pastikan cron atau Windows Task Scheduler menjalankan `php artisan schedule:run`
+- Ubah kata sandi akun seed default
 - Jalankan optimasi Laravel:
 
 ```bash

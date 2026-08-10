@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'youtube' => [
+        'channel_id' => env('YOUTUBE_CHANNEL_ID'),
+        'feed_url' => env('YOUTUBE_FEED_URL'),
+        'import_user_id' => env('YOUTUBE_IMPORT_USER_ID'),
+        'max_import' => env('YOUTUBE_MAX_IMPORT', 15),
+    ],
+
 ];
